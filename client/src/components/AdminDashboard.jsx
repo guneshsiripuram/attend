@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Filter, Download, Users, CheckCircle, Clock, AlertCircle, Shield, LogOut, ChevronRight, UserPlus, Settings, Database, RotateCcw, Trash2, Fingerprint } from 'lucide-react';
+import { Search, Filter, Download, Users, CheckCircle, Clock, AlertCircle, Shield, LogOut, ChevronRight, UserPlus, Settings, Database, RotateCcw, Trash2, Fingerprint, X } from 'lucide-react';
+import { BRANCHES, SECTIONS } from '../constants';
 
 const AdminDashboard = () => {
   const [data, setData] = useState([]);
@@ -22,6 +23,19 @@ const AdminDashboard = () => {
   });
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('attendance');
+  
+  // New States for Add Student Modal
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [addLoading, setAddLoading] = useState(false);
+  const [addError, setAddError] = useState('');
+  const [newStudent, setNewStudent] = useState({
+    full_name: '',
+    roll_number: '',
+    college_email: '',
+    branch: '',
+    section: '',
+    password: 'password123' // Default password
+  });
 
   const fetchData = async () => {
     setLoading(true);
@@ -82,6 +96,71 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleAddStudent = async (e) => {
+    e.preventDefault();
+    setAddLoading(true);
+    setAddError('');
+    try {
+      await axios.post('/auth/register', {
+        ...newStudent,
+        role: 'student'
+      });
+      setIsAddModalOpen(false);
+      setNewStudent({
+        full_name: '',
+        roll_number: '',
+        college_email: '',
+        branch: '',
+        section: '',
+        password: 'password123'
+      });
+      fetchData();
+    } catch (err) {
+      setAddError(err.response?.data?.message || 'Failed to add student');
+    } finally {
+      setAddLoading(false);
+    }
+  };
+
+  const handleDownloadReport = () => {
+    if (!data || data.length === 0) {
+      alert('No data to export');
+      return;
+    }
+
+    // Create CSV header
+    const headers = ['Name', 'Roll Number', 'Branch', 'Section', 'Email', 'Date', 'Time', 'Status'];
+    
+    // Convert data to rows
+    const rows = data.map(log => [
+      log.full_name,
+      log.roll_number,
+      log.branch,
+      log.section,
+      log.college_email,
+      new Date(log.timestamp).toLocaleDateString(),
+      new Date(log.timestamp).toLocaleTimeString(),
+      log.status
+    ]);
+
+    // Combine headers and rows
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    // Create blob and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Attendance_Report_${filters.date || 'Export'}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const menuItems = [
     { id: 'attendance', label: 'Attendance Logs', icon: Clock },
     { id: 'students', label: 'Manage Students', icon: Users },
@@ -140,16 +219,22 @@ const AdminDashboard = () => {
                 </h1>
                 <p className="text-slate-500 text-sm">System management console & real-time analytics</p>
               </div>
-              <div className="flex gap-3">
-                  <button className="flex items-center gap-2 bg-white border border-slate-200 px-5 py-2.5 rounded-xl text-slate-600 hover:bg-slate-50 transition-all font-semibold shadow-sm text-sm">
-                  <Download className="w-4 h-4" />
-                  Report
+                <div className="flex gap-3">
+                  <button 
+                    onClick={handleDownloadReport}
+                    className="flex items-center gap-2 bg-white border border-slate-200 px-5 py-2.5 rounded-xl text-slate-600 hover:bg-slate-50 transition-all font-semibold shadow-sm text-sm"
+                  >
+                    <Download className="w-4 h-4" />
+                    Report
                   </button>
-                  <button className="flex items-center gap-2 bg-primary-600 px-5 py-2.5 rounded-xl text-white hover:bg-primary-700 transition-all font-semibold shadow-lg shadow-primary-100 text-sm">
-                  <UserPlus className="w-4 h-4" />
-                  Add Student
+                  <button 
+                    onClick={() => setIsAddModalOpen(true)}
+                    className="flex items-center gap-2 bg-primary-600 px-5 py-2.5 rounded-xl text-white hover:bg-primary-700 transition-all font-semibold shadow-lg shadow-primary-100 text-sm"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    Add Student
                   </button>
-              </div>
+                </div>
             </div>
 
             {activeTab === 'attendance' && (
@@ -520,6 +605,110 @@ const AdminDashboard = () => {
       </div>
     </div>
   </div>
+
+  {/* Add Student Modal */}
+  {isAddModalOpen && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0">
+          <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <UserPlus className="text-primary-600 w-5 h-5" />
+            Add New Student
+          </h2>
+          <button onClick={() => setIsAddModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full transition-all">
+            <X className="w-5 h-5 text-slate-400" />
+          </button>
+        </div>
+
+        <form onSubmit={handleAddStudent} className="p-6 flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Full Name</label>
+            <input 
+              required
+              type="text" 
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+              placeholder="e.g. John Doe"
+              value={newStudent.full_name}
+              onChange={(e) => setNewStudent({...newStudent, full_name: e.target.value})}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Roll Number</label>
+              <input 
+                required
+                type="text" 
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all uppercase"
+                placeholder="24981A05..."
+                value={newStudent.roll_number}
+                onChange={(e) => setNewStudent({...newStudent, roll_number: e.target.value.toUpperCase()})}
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">College Email</label>
+              <input 
+                required
+                type="email" 
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all"
+                placeholder="email@college.edu"
+                value={newStudent.college_email}
+                onChange={(e) => setNewStudent({...newStudent, college_email: e.target.value})}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Branch</label>
+              <select 
+                required
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all appearance-none cursor-pointer"
+                value={newStudent.branch}
+                onChange={(e) => setNewStudent({...newStudent, branch: e.target.value})}
+              >
+                <option value="" disabled>Select Branch</option>
+                {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Section</label>
+              <select 
+                required
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all appearance-none cursor-pointer"
+                value={newStudent.section}
+                onChange={(e) => setNewStudent({...newStudent, section: e.target.value})}
+              >
+                <option value="" disabled>Sec</option>
+                {SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {addError && (
+            <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs font-medium flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              {addError}
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-col gap-3">
+            <button 
+              type="submit"
+              disabled={addLoading}
+              className="w-full py-4 bg-primary-600 text-white font-bold rounded-2xl shadow-xl shadow-primary-100 hover:bg-primary-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {addLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus className="w-5 h-5" />}
+              <span>{addLoading ? 'Adding Student...' : 'Register Student'}</span>
+            </button>
+            <p className="text-[10px] text-slate-400 text-center uppercase tracking-widest font-bold">
+              Default Password: password123
+            </p>
+          </div>
+        </form>
+      </div>
+    </div>
+  )}
 </div>
   );
 };
