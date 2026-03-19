@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Filter, Download, Users, CheckCircle, Clock, AlertCircle, Shield, LogOut, ChevronRight, UserPlus, Settings, Database, RotateCcw, Trash2, Fingerprint, X } from 'lucide-react';
+import { Search, Filter, Download, Users, CheckCircle, Clock, AlertCircle, Shield, LogOut, ChevronRight, UserPlus, Settings, Database, RotateCcw, Trash2, Fingerprint, X, History } from 'lucide-react';
+import AttendanceHistory from './AttendanceHistory';
 import { BRANCHES, SECTIONS } from '../constants';
 
 const AdminDashboard = () => {
@@ -163,6 +164,7 @@ const AdminDashboard = () => {
 
   const menuItems = [
     { id: 'attendance', label: 'Attendance Logs', icon: Clock },
+    { id: 'history', label: 'Daily History', icon: History },
     { id: 'students', label: 'Manage Students', icon: Users },
     { id: 'system', label: 'System Health', icon: Database },
     { id: 'settings', label: 'Portal Settings', icon: Settings },
@@ -502,6 +504,8 @@ const AdminDashboard = () => {
               </table>
             </div>
           </div>
+        ) : activeTab === 'history' ? (
+          <AttendanceHistory />
         ) : activeTab === 'students' ? (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="overflow-x-auto">

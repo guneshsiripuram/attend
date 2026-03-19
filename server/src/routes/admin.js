@@ -134,4 +134,34 @@ router.delete('/students/:id', authMiddleware, adminMiddleware, async (req, res)
   }
 });
 
+// Get Attendance History grouped by day
+router.get('/attendance/history', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const q = `
+      SELECT 
+        DATE(al.timestamp) as date,
+        COUNT(*) as count,
+        json_agg(json_build_object(
+          'id', al.id,
+          'timestamp', al.timestamp,
+          'status', al.status,
+          'full_name', u.full_name,
+          'roll_number', u.roll_number,
+          'email', u.college_email,
+          'section', u.section,
+          'branch', u.branch
+        ) ORDER BY al.timestamp DESC) as records
+      FROM attendance_logs al
+      JOIN users u ON al.user_id = u.id
+      GROUP BY DATE(al.timestamp)
+      ORDER BY DATE(al.timestamp) DESC
+    `;
+    const result = await query(q);
+    res.json({ data: result.rows });
+  } catch (error) {
+    console.error('HISTORY_API_ERROR:', error);
+    res.status(500).json({ message: 'Error fetching attendance history' });
+  }
+});
+
 module.exports = router;
