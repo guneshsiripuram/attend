@@ -9,6 +9,9 @@ const AttendanceHistory = () => {
   const [loading, setLoading] = useState(true);
   const [expandedDates, setExpandedDates] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [dateFilterType, setDateFilterType] = useState('all');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     fetchHistory();
@@ -32,6 +35,34 @@ const AttendanceHistory = () => {
       ...prev,
       [date]: !prev[date]
     }));
+  };
+
+  const getFilteredHistory = () => {
+    let filtered = [...history];
+    const now = new Date();
+
+    if (dateFilterType === '7days') {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(now.getDate() - 7);
+      filtered = filtered.filter(day => new Date(day.date) >= sevenDaysAgo);
+    } else if (dateFilterType === '30days') {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(now.getDate() - 30);
+      filtered = filtered.filter(day => new Date(day.date) >= thirtyDaysAgo);
+    } else if (dateFilterType === 'month') {
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      filtered = filtered.filter(day => new Date(day.date) >= firstDayOfMonth);
+    } else if (dateFilterType === 'custom' && startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      filtered = filtered.filter(day => {
+        const d = new Date(day.date);
+        return d >= start && d <= end;
+      });
+    }
+
+    return filtered;
   };
 
   const getDayRecords = (day) => {
@@ -78,27 +109,57 @@ const AttendanceHistory = () => {
       </div>
 
       {/* Search and Filters */}
-      <div className="flex flex-col md:flex-row gap-4 mb-8">
-        <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-          <input 
-            type="text" 
-            placeholder="Search Records" 
-            className="w-full pl-12 pr-4 py-4 bg-white border border-slate-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-primary-500 outline-none transition-all placeholder:text-slate-300 font-medium"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+      <div className="flex flex-col gap-4 mb-8">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Search Records" 
+              className="w-full pl-12 pr-4 py-4 bg-white border border-slate-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-primary-500 outline-none transition-all placeholder:text-slate-300 font-medium"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="relative md:w-64">
+            <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <select 
+              className="w-full pl-12 pr-10 py-4 bg-white border border-slate-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-primary-500 outline-none transition-all appearance-none cursor-pointer font-medium text-slate-600"
+              value={dateFilterType}
+              onChange={(e) => setDateFilterType(e.target.value)}
+            >
+              <option value="all">Select Date Range</option>
+              <option value="7days">Last 7 Days</option>
+              <option value="30days">Last 30 Days</option>
+              <option value="month">This Month</option>
+              <option value="custom">Custom Range</option>
+            </select>
+            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+          </div>
         </div>
-        <div className="relative md:w-64">
-          <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-          <select className="w-full pl-12 pr-10 py-4 bg-white border border-slate-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-primary-500 outline-none transition-all appearance-none cursor-pointer font-medium text-slate-600">
-            <option>Select Date Range</option>
-            <option>Last 7 Days</option>
-            <option>Last 30 Days</option>
-            <option>This Month</option>
-          </select>
-          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-        </div>
+
+        {dateFilterType === 'custom' && (
+          <div className="flex flex-col md:flex-row items-center gap-4 p-4 bg-blue-50/50 rounded-2xl border border-blue-100 animate-in slide-in-from-top-2 duration-300">
+            <div className="flex items-center gap-3 flex-1 w-full">
+              <span className="text-xs font-bold text-blue-600 uppercase tracking-widest whitespace-nowrap">From</span>
+              <input 
+                type="date" 
+                className="flex-1 px-4 py-2 bg-white border border-blue-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold text-slate-700"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-3 flex-1 w-full">
+              <span className="text-xs font-bold text-blue-600 uppercase tracking-widest whitespace-nowrap">To</span>
+              <input 
+                type="date" 
+                className="flex-1 px-4 py-2 bg-white border border-blue-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-sm font-bold text-slate-700"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* History Cards */}
@@ -110,7 +171,7 @@ const AttendanceHistory = () => {
         </div>
       ) : (
         <div className="space-y-4">
-          {history.map((day) => {
+          {getFilteredHistory().map((day) => {
             const currentTotal = totalStudentsRegistry; // Use real registry size
             const present = day.present_count;
             const absent = Math.max(0, currentTotal - present);
