@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { ChevronDown, ChevronRight, Download, Calendar, Users, Clock } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, Calendar, Users, Clock, Search, Filter, MoreHorizontal } from 'lucide-react';
 
 const AttendanceHistory = () => {
   const [history, setHistory] = useState([]);
+  const [totalStudentsRegistry, setTotalStudentsRegistry] = useState(0);
+  const [allStudents, setAllStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedDates, setExpandedDates] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchHistory();
@@ -13,10 +16,10 @@ const AttendanceHistory = () => {
 
   const fetchHistory = async () => {
     try {
-      const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/admin/attendance/history`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
+      const response = await axios.get('/admin/attendance/history');
       setHistory(response.data.data);
+      setTotalStudentsRegistry(response.data.totalStudents);
+      setAllStudents(response.data.allStudents);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching history:', error);
@@ -31,151 +34,216 @@ const AttendanceHistory = () => {
     }));
   };
 
-  const downloadCSV = (date, records) => {
-    const headers = ['Name', 'Roll Number', 'Email', 'Section', 'Branch', 'Time', 'Status'];
-    const rows = records.map(r => [
-      r.full_name,
-      r.roll_number,
-      r.email,
-      r.section,
-      r.branch,
-      new Date(r.timestamp).toLocaleTimeString(),
-      r.status
-    ]);
-
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `attendance_${date}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const getDayRecords = (day) => {
+    const presentIds = new Set(day.present_records.map(r => r.user_id));
+    const absentees = allStudents
+      .filter(s => !presentIds.has(s.id))
+      .map(s => ({
+        ...s,
+        timestamp: null,
+        status: 'Absent'
+      }));
+    
+    const combined = [...day.present_records, ...absentees];
+    
+    if (searchQuery) {
+      return combined.filter(r => 
+        r.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        r.roll_number?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    return combined;
   };
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Attendance History</h2>
-        <div className="text-sm text-gray-500">
-          Showing {history.length} days of records
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {/* Header section */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div>
+          <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Daily History</h2>
+          <p className="text-slate-500 text-sm mt-1">Review and manage past attendance records</p>
+        </div>
+        <button className="flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-2xl font-bold shadow-xl shadow-slate-200 hover:scale-105 transition-all text-sm group">
+          <Download className="w-4 h-4 group-hover:bounce" />
+          Download Report
+        </button>
+      </div>
+
+      {/* Search and Filters */}
+      <div className="flex flex-col md:flex-row gap-4 mb-8">
+        <div className="relative flex-1">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <input 
+            type="text" 
+            placeholder="Search Records" 
+            className="w-full pl-12 pr-4 py-4 bg-white border border-slate-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-primary-500 outline-none transition-all placeholder:text-slate-300 font-medium"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        <div className="relative md:w-64">
+          <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <select className="w-full pl-12 pr-10 py-4 bg-white border border-slate-100 rounded-2xl shadow-sm focus:ring-2 focus:ring-primary-500 outline-none transition-all appearance-none cursor-pointer font-medium text-slate-600">
+            <option>Select Date Range</option>
+            <option>Last 7 Days</option>
+            <option>Last 30 Days</option>
+            <option>This Month</option>
+          </select>
+          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
         </div>
       </div>
 
+      {/* History Cards */}
       {history.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm p-12 text-center border border-gray-100">
-          <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-700">No records found</h3>
-          <p className="text-gray-500">Historical data will appear here once attendance is marked.</p>
+        <div className="bg-white rounded-3xl p-20 text-center border border-slate-100 shadow-sm">
+          <Calendar className="w-20 h-20 text-slate-200 mx-auto mb-6" />
+          <h3 className="text-xl font-bold text-slate-800">No records found</h3>
+          <p className="text-slate-400 max-w-xs mx-auto mt-2">Historical data will appear here once attendance sessions are completed.</p>
         </div>
       ) : (
         <div className="space-y-4">
-          {history.map((day) => (
-            <div key={day.date} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              <button
-                onClick={() => toggleDate(day.date)}
-                className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
-                id={`date-btn-${day.date}`}
-              >
-                <div className="flex items-center space-x-4">
-                  <div className="bg-blue-50 p-2 rounded-lg">
-                    <Calendar className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div className="text-left">
-                    <h3 className="font-semibold text-gray-800">
-                      {new Date(day.date).toLocaleDateString('en-US', { 
-                        weekday: 'long', 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric' 
-                      })}
-                    </h3>
-                    <div className="flex items-center space-x-3 text-sm text-gray-500 mt-0.5">
-                      <span className="flex items-center">
-                        <Users className="w-3.5 h-3.5 mr-1" />
-                        {day.count} Present
-                      </span>
+          {history.map((day) => {
+            const currentTotal = totalStudentsRegistry; // Use real registry size
+            const present = day.present_count;
+            const absent = Math.max(0, currentTotal - present);
+            const percentage = Math.round((present / currentTotal) * 100);
+            const isExpanded = expandedDates[day.date];
+
+            return (
+              <div key={day.date} className={`bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden transition-all duration-300 ${isExpanded ? 'ring-2 ring-primary-500/20' : ''}`}>
+                <button
+                  onClick={() => toggleDate(day.date)}
+                  className="w-full flex flex-col md:flex-row items-center justify-between p-6 md:px-8 hover:bg-slate-50/50 transition-colors gap-4"
+                >
+                  <div className="flex items-center gap-6 w-full md:w-auto">
+                    <div className="bg-primary-50 p-3 rounded-2xl">
+                      <Calendar className="w-6 h-6 text-primary-600" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-extrabold text-slate-900 text-lg">
+                        {new Date(day.date).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })}
+                      </h3>
+                      {isExpanded && (
+                        <p className="text-sm text-slate-400 font-medium">
+                          {new Date(day.date).toLocaleDateString('en-US', { weekday: 'long' })}
+                        </p>
+                      )}
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      downloadCSV(day.date, day.records);
-                    }}
-                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    title="Export CSV"
-                  >
-                    <Download className="w-5 h-5" />
-                  </button>
-                  {expandedDates[day.date] ? (
-                    <ChevronDown className="w-5 h-5 text-gray-400" />
-                  ) : (
-                    <ChevronRight className="w-5 h-5 text-gray-400" />
-                  )}
-                </div>
-              </button>
 
-              {expandedDates[day.date] && (
-                <div className="border-t border-gray-100 overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roll No</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch-Sec</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-100">
-                      {day.records.map((record) => (
-                        <tr key={record.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs mr-3">
-                                {record.full_name.charAt(0)}
-                              </div>
-                              <div>
-                                <div className="text-sm font-medium text-gray-900">{record.full_name}</div>
-                                <div className="text-xs text-gray-500">{record.email}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                            {record.roll_number || 'N/A'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                            {record.branch}-{record.section}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                            <div className="flex items-center">
-                              <Clock className="w-3.5 h-3.5 mr-1 text-gray-400" />
-                              {new Date(record.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          ))}
+                  <div className="flex flex-1 items-center justify-around md:justify-center gap-8 md:gap-16 w-full md:w-auto">
+                    <div className="text-center md:text-left">
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Attendance</p>
+                       <p className="text-lg font-black text-slate-900">{percentage}%</p>
+                    </div>
+                    <div className="text-center md:text-left">
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Status</p>
+                       <div className="flex items-center gap-2">
+                         <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                         <span className="text-sm font-bold text-slate-700">Complete</span>
+                       </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 w-full md:w-auto justify-end">
+                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-slate-600 font-bold text-sm">
+                      <Calendar className="w-4 h-4" />
+                      Actions
+                      <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                    </div>
+                  </div>
+                </button>
+
+                {isExpanded && (
+                  <div className="p-8 pt-4 border-t border-slate-50 animate-in slide-in-from-top-2 duration-500">
+                    {/* Stats Row */}
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-10 bg-slate-50/50 p-8 rounded-[2rem] border border-slate-100">
+                      <div className="grid grid-cols-3 gap-8 md:gap-12">
+                        <div>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Total Students</p>
+                          <p className="text-3xl font-black text-slate-900">{currentTotal}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Present</p>
+                          <p className="text-3xl font-black text-green-600">{present}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Absent</p>
+                          <p className="text-3xl font-black text-red-500">{absent}</p>
+                        </div>
+                      </div>
+
+                      {/* Progress Circle Mockup */}
+                      <div className="relative w-24 h-24 flex items-center justify-center">
+                        <svg className="w-full h-full -rotate-90">
+                          <circle cx="48" cy="48" r="40" className="fill-none stroke-slate-200 stroke-[8]" />
+                          <circle 
+                            cx="48" cy="48" r="40" 
+                            className="fill-none stroke-green-500 stroke-[8]" 
+                            strokeDasharray={251.2}
+                            strokeDashoffset={251.2 - (251.2 * percentage) / 100}
+                            strokeLinecap="round" 
+                          />
+                        </svg>
+                        <span className="absolute text-sm font-black text-slate-900">{percentage}%</span>
+                      </div>
+                    </div>
+
+                    {/* Records Table */}
+                    <div className="overflow-x-auto rounded-3xl border border-slate-100">
+                      <table className="min-w-full divide-y divide-slate-100">
+                        <thead className="bg-slate-50/50">
+                          <tr>
+                            <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Student Name</th>
+                            <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Roll Number</th>
+                            <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Check-In Time</th>
+                            <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-slate-50">
+                          {getDayRecords(day).map((record, index) => (
+                            <tr key={`${day.date}-${record.id || index}`} className="hover:bg-slate-50/30 transition-colors group">
+                              <td className="px-8 py-5 whitespace-nowrap">
+                                <span className="text-sm font-bold text-slate-800">{record.full_name}</span>
+                              </td>
+                              <td className="px-8 py-5 whitespace-nowrap">
+                                <span className="text-sm font-semibold text-slate-500">{record.roll_number}</span>
+                              </td>
+                              <td className="px-8 py-5 whitespace-nowrap">
+                                <span className="text-sm text-slate-700 font-medium">
+                                  {record.timestamp ? new Date(record.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--'}
+                                </span>
+                              </td>
+                              <td className="px-8 py-5 whitespace-nowrap">
+                                <div className="flex items-center gap-2">
+                                  <span className={`w-2 h-2 rounded-full ${record.status === 'Absent' ? 'bg-red-500' : 'bg-green-500'}`}></span>
+                                  <span className={`text-sm font-bold ${record.status === 'Absent' ? 'text-red-500' : 'text-slate-700'}`}>
+                                    {record.status}
+                                  </span>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

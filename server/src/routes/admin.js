@@ -137,27 +137,40 @@ router.delete('/students/:id', authMiddleware, adminMiddleware, async (req, res)
 // Get Attendance History grouped by day
 router.get('/attendance/history', authMiddleware, adminMiddleware, async (req, res) => {
   try {
+    // Get total student count
+    const registryCountResult = await query("SELECT COUNT(*) FROM users WHERE role = 'student'");
+    const totalStudents = parseInt(registryCountResult.rows[0].count);
+
     const q = `
       SELECT 
         DATE(al.timestamp) as date,
-        COUNT(*) as count,
+        COUNT(DISTINCT al.user_id) as present_count,
         json_agg(json_build_object(
           'id', al.id,
           'timestamp', al.timestamp,
           'status', al.status,
+          'user_id', al.user_id,
           'full_name', u.full_name,
           'roll_number', u.roll_number,
           'email', u.college_email,
           'section', u.section,
           'branch', u.branch
-        ) ORDER BY al.timestamp DESC) as records
+        ) ORDER BY al.timestamp DESC) as present_records
       FROM attendance_logs al
       JOIN users u ON al.user_id = u.id
       GROUP BY DATE(al.timestamp)
       ORDER BY DATE(al.timestamp) DESC
     `;
     const result = await query(q);
-    res.json({ data: result.rows });
+
+    // Get all students to help identify absentees on the frontend
+    const allStudentsResult = await query("SELECT id, full_name, roll_number, section, branch FROM users WHERE role = 'student'");
+    
+    res.json({ 
+      data: result.rows,
+      totalStudents,
+      allStudents: allStudentsResult.rows
+    });
   } catch (error) {
     console.error('HISTORY_API_ERROR:', error);
     res.status(500).json({ message: 'Error fetching attendance history' });
