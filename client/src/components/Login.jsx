@@ -19,7 +19,7 @@ const Login = ({ onLogin }) => {
 
     try {
       const resp = await axios.post('/auth/login', { email, password });
-      onLogin(resp.data.user);
+      onLogin(resp.data.user, resp.data.token);
       
       // Clear any previous error on success
       setError('');
