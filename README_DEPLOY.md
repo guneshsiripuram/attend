@@ -27,6 +27,7 @@ This guide takes you through deploying your Attendance Portal for **FREE** witho
    - `CAMPUS_LAT`: `17.925615`
    - `CAMPUS_LNG`: `83.424361`
    - `MAX_DISTANCE_METERS`: `100`
+   - `GOOGLE_CLIENT_ID`: (The Client ID you got from Google)
 
 ## 3. Deploy Frontend (Netlify) - 100% Free
 1. Go to [Netlify.com](https://www.netlify.com/) and log in with GitHub.

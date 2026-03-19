@@ -2,9 +2,74 @@ const express = require('express');
 const { query } = require('../db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-
+const { OAuth2Client } = require('google-auth-library');
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const router = express.Router();
+
+// Google Login
+router.post('/google-login', async (req, res) => {
+  const { credential } = req.body;
+  
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+    
+    const payload = ticket.getPayload();
+    const { email, name, sub: googleId, picture } = payload;
+    const emailLower = email.toLowerCase().trim();
+
+    // Domain validation (skip for admins)
+    const collegeDomain = (process.env.COLLEGE_DOMAIN || '@raghuenggcollege.in').toLowerCase();
+    
+    // Check if user exists
+    let userResult = await query('SELECT * FROM users WHERE college_email = $1', [emailLower]);
+    let user;
+
+    if (userResult.rows.length === 0) {
+      // Auto-register new user
+      // Role is student by default
+      if (!emailLower.endsWith(collegeDomain)) {
+         return res.status(400).json({ message: `Only ${collegeDomain} emails are allowed.` });
+      }
+
+      console.log('Auto-registering new student from Google:', emailLower);
+      const newUser = await query(
+        'INSERT INTO users (full_name, college_email, role, face_embedding) VALUES ($1, $2, $3, $4) RETURNING *',
+        [name, emailLower, 'student', null]
+      );
+      user = newUser.rows[0];
+    } else {
+      user = userResult.rows[0];
+    }
+
+    // Generate JWT
+    const token = jwt.sign(
+      { id: user.id, role: user.role, name: user.full_name },
+      process.env.JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    res.json({
+      user: { 
+        id: user.id, 
+        full_name: user.full_name, 
+        role: user.role, 
+        email: user.college_email,
+        hasFace: !!user.face_embedding,
+        picture
+      },
+      token,
+      message: 'Logged in with Google'
+    });
+
+  } catch (error) {
+    console.error('GOOGLE_AUTH_ERROR:', error);
+    res.status(401).json({ message: 'Invalid Google token' });
+  }
+});
 
 // Registration
 router.post('/register', async (req, res) => {
@@ -105,6 +170,31 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error during login' });
+  }
+});
+
+// Complete Profile (for Google Users)
+router.post('/complete-profile', async (req, res) => {
+  const { roll_number, section, branch, face_descriptor, email } = req.body;
+  
+  try {
+    console.log('Completing profile for:', email);
+    const result = await query(
+      'UPDATE users SET roll_number = $1, section = $2, branch = $3, face_embedding = $4 WHERE college_email = $5 RETURNING *',
+      [roll_number, section, branch, JSON.stringify(face_descriptor), email.toLowerCase().trim()]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ 
+      user: result.rows[0], 
+      message: 'Profile completed successfully' 
+    });
+  } catch (error) {
+    console.error('COMPLETE_PROFILE_ERROR:', error);
+    res.status(500).json({ message: 'Server error during profile completion' });
   }
 });
 
