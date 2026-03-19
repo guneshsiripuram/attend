@@ -1,0 +1,527 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { Search, Filter, Download, Users, CheckCircle, Clock, AlertCircle, Shield, LogOut, ChevronRight, UserPlus, Settings, Database, RotateCcw, Trash2, Fingerprint } from 'lucide-react';
+
+const AdminDashboard = () => {
+  const [data, setData] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [summary, setSummary] = useState({ presenttoday: 0, totalstudents: 0 });
+  const [filters, setFilters] = useState({ 
+    name: '', 
+    email: '', 
+    date: new Date().toISOString().split('T')[0],
+    branch: '',
+    section: '',
+    rollNumber: ''
+  });
+  const [studentFilters, setStudentFilters] = useState({
+    name: '',
+    rollNumber: '',
+    branch: '',
+    section: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('attendance');
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      if (activeTab === 'attendance') {
+        const { name, email, date, branch, section, rollNumber } = filters;
+        const resp = await axios.get('/admin/attendance/all', {
+          params: { name, email, date, branch, section, rollNumber }
+        });
+        setData(resp.data.data);
+        if (resp.data.summary) {
+          setSummary(resp.data.summary);
+        }
+      } else if (activeTab === 'students') {
+        const { name, rollNumber, branch, section } = studentFilters;
+        const resp = await axios.get('/admin/students', {
+          params: { name, rollNumber, branch, section }
+        });
+        setStudents(resp.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch admin data', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [
+    activeTab,
+    filters.date, filters.name, filters.branch, filters.section, filters.rollNumber,
+    studentFilters.name, studentFilters.rollNumber, studentFilters.branch, studentFilters.section
+  ]);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    fetchData();
+  };
+
+  const handleResetFace = async (id) => {
+    if (!window.confirm('Are you sure you want to reset this student\'s face data? They will need to re-enroll next time they log in.')) return;
+    try {
+      await axios.post(`/admin/students/${id}/reset-face`);
+      fetchData();
+    } catch (err) {
+      alert('Failed to reset face data');
+    }
+  };
+
+  const handleDeleteStudent = async (id) => {
+    if (!window.confirm('DANGER: This will permanently delete the student and ALL their attendance logs. Proceed?')) return;
+    try {
+      await axios.delete(`/admin/students/${id}`);
+      fetchData();
+    } catch (err) {
+      alert('Failed to delete student');
+    }
+  };
+
+  const menuItems = [
+    { id: 'attendance', label: 'Attendance Logs', icon: Clock },
+    { id: 'students', label: 'Manage Students', icon: Users },
+    { id: 'system', label: 'System Health', icon: Database },
+    { id: 'settings', label: 'Portal Settings', icon: Settings },
+  ];
+
+  return (
+    <div className="flex h-[calc(100vh-100px)] -mt-8 -mx-4 overflow-hidden">
+      {/* Sidebar */}
+      <div className="w-64 bg-slate-900 text-white p-6 hidden md:flex flex-col gap-8 h-full flex-shrink-0 z-20">
+        <div className="flex items-center gap-3 px-2">
+          <div className="p-2 bg-primary-500 rounded-lg">
+            <Shield className="w-6 h-6 text-white" />
+          </div>
+          <span className="font-bold text-xl tracking-tight">Admin OS</span>
+        </div>
+
+        <nav className="flex flex-col gap-2">
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                activeTab === item.id 
+                ? 'bg-primary-600 text-white shadow-lg shadow-primary-900/50' 
+                : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <item.icon className="w-5 h-5" />
+              <span className="font-semibold">{item.label}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="mt-auto pt-8 border-t border-slate-800">
+           <div className="p-4 bg-slate-800/50 rounded-2xl flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center font-bold">R</div>
+              <div className="overflow-hidden">
+                <p className="text-sm font-bold truncate">Super Admin</p>
+                <p className="text-xs text-slate-500 truncate">raghumail</p>
+              </div>
+           </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col h-full bg-slate-100/50 overflow-hidden">
+        {/* Fixed Top Dashboard Header & Controls */}
+        <div className="flex-shrink-0 border-b border-slate-200/50 bg-white/50 backdrop-blur-sm z-20">
+          <div className="p-8 pb-4 max-w-6xl mx-auto flex flex-col gap-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h1 className="text-3xl font-bold text-slate-900 leading-tight">
+                  {activeTab === 'attendance' ? 'Attendance Control Center' : menuItems.find(i => i.id === activeTab).label}
+                </h1>
+                <p className="text-slate-500 text-sm">System management console & real-time analytics</p>
+              </div>
+              <div className="flex gap-3">
+                  <button className="flex items-center gap-2 bg-white border border-slate-200 px-5 py-2.5 rounded-xl text-slate-600 hover:bg-slate-50 transition-all font-semibold shadow-sm text-sm">
+                  <Download className="w-4 h-4" />
+                  Report
+                  </button>
+                  <button className="flex items-center gap-2 bg-primary-600 px-5 py-2.5 rounded-xl text-white hover:bg-primary-700 transition-all font-semibold shadow-lg shadow-primary-100 text-sm">
+                  <UserPlus className="w-4 h-4" />
+                  Add Student
+                  </button>
+              </div>
+            </div>
+
+            {activeTab === 'attendance' && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                  <div className="p-3 bg-blue-50 rounded-xl">
+                    <CheckCircle className="text-blue-600 w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-tight">Live Presence</p>
+                    <p className="text-2xl font-bold text-slate-900">{summary.presenttoday || 0}</p>
+                  </div>
+                </div>
+                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                  <div className="p-3 bg-green-50 rounded-xl">
+                    <Users className="text-green-600 w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-tight">Registry Size</p>
+                    <p className="text-2xl font-bold text-slate-900">{summary.totalstudents || 0}</p>
+                  </div>
+                </div>
+                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                  <div className="p-3 bg-amber-50 rounded-xl">
+                    <Clock className="text-amber-600 w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-tight">Fulfillment</p>
+                    <p className="text-2xl font-bold text-slate-900">
+                      {summary.totalstudents > 0 ? Math.round((summary.presenttoday / summary.totalstudents) * 100) : 0}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ATTENDANCE CONTROLS - NOW STABLE IN THE FIXED HEADER */}
+          {activeTab === 'attendance' && (
+             <div className="bg-white px-8 pb-4">
+                <div className="max-w-6xl mx-auto bg-slate-50/50 rounded-2xl p-5 border border-slate-100">
+                   <div className="flex flex-col gap-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                           <Clock className="w-4 h-4 text-primary-500" />
+                           <h3 className="font-bold text-slate-800 text-sm">Recent Attendance Logs</h3>
+                        </div>
+                        <input 
+                          type="date" 
+                          className="px-4 py-1.5 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-xs"
+                          value={filters.date}
+                          onChange={(e) => setFilters({...filters, date: e.target.value})}
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="relative">
+                        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <select 
+                          className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-xs w-full appearance-none cursor-pointer"
+                          value={filters.branch}
+                          onChange={(e) => setFilters({...filters, branch: e.target.value})}
+                        >
+                          <option value="">All Branches</option>
+                          <option value="CSE">CSE (Computer Science)</option>
+                          <option value="ECE">ECE (Electronics)</option>
+                          <option value="EEE">EEE (Electrical)</option>
+                          <option value="MECH">MECH (Mechanical)</option>
+                          <option value="CIVIL">CIVIL (Civil)</option>
+                          <option value="AI&ML">AI & ML</option>
+                          <option value="IT">IT (Information Tech)</option>
+                        </select>
+                      </div>
+                      <div className="relative">
+                        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <select 
+                          className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-xs w-full appearance-none cursor-pointer"
+                          value={filters.section}
+                          onChange={(e) => setFilters({...filters, section: e.target.value})}
+                        >
+                          <option value="">All Sections</option>
+                          <option value="A">Section A</option>
+                          <option value="B">Section B</option>
+                          <option value="C">Section C</option>
+                          <option value="D">Section D</option>
+                        </select>
+                      </div>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input 
+                          type="text" 
+                          placeholder="Search Roll Number" 
+                          className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-xs w-full"
+                          value={filters.rollNumber}
+                          onChange={(e) => setFilters({...filters, rollNumber: e.target.value})}
+                        />
+                      </div>
+                   </div>
+                </div>
+             </div>
+             
+             {/* TABLE HEADERS - FIXED POSITION BELOW SEARCH */}
+             <div className="max-w-6xl mx-auto mt-4 px-2">
+                <table className="w-full text-left table-fixed">
+                   <thead>
+                     <tr>
+                       <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[35%]">Student Details</th>
+                       <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[15%]">Roll/Sec</th>
+                       <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[20%]">Timestamp</th>
+                       <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[15%] text-center">Status</th>
+                       <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[15%] text-right">Actions</th>
+                     </tr>
+                   </thead>
+                </table>
+             </div>
+          </div>
+       )}
+
+        {/* STUDENT REGISTRY CONTROLS */}
+        {activeTab === 'students' && (
+           <div className="bg-white px-8 pb-4">
+              <div className="max-w-6xl mx-auto bg-slate-50/50 rounded-2xl p-5 border border-slate-100">
+                 <div className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                         <Users className="w-4 h-4 text-primary-500" />
+                         <h3 className="font-bold text-slate-800 text-sm">Student Management Registry</h3>
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-medium bg-white px-3 py-1 rounded-full border border-slate-100">
+                        {students.length} Students Registered
+                      </p>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input 
+                          type="text" 
+                          placeholder="Search Name" 
+                          className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-xs w-full"
+                          value={studentFilters.name}
+                          onChange={(e) => setStudentFilters({...studentFilters, name: e.target.value})}
+                        />
+                      </div>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input 
+                          type="text" 
+                          placeholder="Search Roll Number" 
+                          className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-xs w-full"
+                          value={studentFilters.rollNumber}
+                          onChange={(e) => setStudentFilters({...studentFilters, rollNumber: e.target.value})}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <select 
+                            className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-xs w-full appearance-none cursor-pointer"
+                            value={studentFilters.branch}
+                            onChange={(e) => setStudentFilters({...studentFilters, branch: e.target.value})}
+                          >
+                            <option value="">All Branches</option>
+                            <option value="CSE">CSE</option>
+                            <option value="ECE">ECE</option>
+                            <option value="EEE">EEE</option>
+                            <option value="MECH">MECH</option>
+                            <option value="CIVIL">CIVIL</option>
+                            <option value="AI&ML">AI & ML</option>
+                            <option value="IT">IT</option>
+                          </select>
+                        </div>
+                      </div>
+                   </div>
+                </div>
+             </div>
+             
+             {/* TABLE HEADERS - FIXED */}
+             <div className="max-w-6xl mx-auto mt-4 px-2">
+                <table className="w-full text-left table-fixed">
+                   <thead>
+                     <tr>
+                       <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[35%]">Student</th>
+                       <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[15%]">Roll/Sec</th>
+                       <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[15%]">Face Data</th>
+                       <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[20%]">Email</th>
+                       <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[15%] text-right">Actions</th>
+                     </tr>
+                   </thead>
+                </table>
+             </div>
+          </div>
+       )}
+    </div>
+
+    {/* Scrollable Logs Section - ONLY ROWS SCROLL NOW */}
+    <div className="flex-1 overflow-y-auto px-8 pb-8 custom-scrollbar bg-slate-50/30">
+      <div className="max-w-6xl mx-auto py-4">
+        {activeTab === 'attendance' ? (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left table-fixed border-separate border-spacing-0">
+                <tbody className="divide-y divide-slate-100">
+                  {loading ? (
+                    <tr>
+                      <td colSpan="5" className="py-20 text-center text-slate-400">
+                        <div className="flex flex-col items-center gap-3">
+                            <Clock className="w-8 h-8 animate-spin text-primary-500" />
+                            <span>Syncing records...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : data.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="py-20 text-center text-slate-400 italic font-medium">No records found for this criteria.</td>
+                    </tr>
+                  ) : (
+                    data.map((row) => (
+                      <tr key={row.id} className="hover:bg-slate-50/50 transition-colors group">
+                        <td className="py-4 px-6 w-[35%] overflow-hidden">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 flex-shrink-0 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center font-black text-xs">
+                              {row.full_name.charAt(0)}
+                            </div>
+                            <div className="overflow-hidden">
+                                <span className="font-bold text-slate-800 block text-xs truncate">{row.full_name}</span>
+                                <span className="text-[9px] text-slate-400 truncate block">{row.college_email}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 w-[15%]">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono text-[9px] font-bold bg-blue-50 px-1.5 py-0.5 rounded text-blue-600">
+                              {row.roll_number}
+                            </span>
+                            <span className="font-mono text-[9px] font-bold bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
+                              {row.section}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 w-[20%]">
+                          <div className="text-[10px]">
+                            <p className="font-bold text-slate-700">{new Date(row.timestamp).toLocaleDateString()}</p>
+                            <p className="text-slate-400">{new Date(row.timestamp).toLocaleTimeString()}</p>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 w-[15%] text-center">
+                          <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider border inline-block ${
+                            row.status === 'Present' 
+                            ? 'bg-green-50 text-green-600 border-green-100' 
+                            : 'bg-red-50 text-red-600 border-red-100'
+                          }`}>
+                            {row.status.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 w-[15%] text-right">
+                            <button className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all opacity-0 group-hover:opacity-100">
+                                <ChevronRight className="w-4 h-4" />
+                            </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : activeTab === 'students' ? (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left table-fixed border-separate border-spacing-0">
+                <tbody className="divide-y divide-slate-100">
+                  {loading ? (
+                    <tr>
+                      <td colSpan="5" className="py-20 text-center text-slate-400">
+                        <div className="flex flex-col items-center gap-3">
+                            <Users className="w-8 h-8 animate-spin text-primary-500" />
+                            <span>Loading Registry...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : students.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="py-20 text-center text-slate-400 italic font-medium">No students found.</td>
+                    </tr>
+                  ) : (
+                    students.map((student) => (
+                      <tr key={student.id} className="hover:bg-slate-50/50 transition-colors group">
+                        <td className="py-4 px-6 w-[35%] overflow-hidden">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 flex-shrink-0 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center font-black text-xs">
+                              {student.full_name.charAt(0)}
+                            </div>
+                            <div className="overflow-hidden">
+                                <span className="font-bold text-slate-800 block text-xs truncate">{student.full_name}</span>
+                                <span className="text-[9px] text-slate-400 truncate block">{student.branch}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 w-[15%]">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-mono text-[9px] font-bold text-slate-700">
+                              {student.roll_number}
+                            </span>
+                            <span className="text-[9px] text-slate-400">
+                              Sec: {student.section}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 w-[15%]">
+                          {student.has_face_data ? (
+                            <div className="flex items-center gap-1.5 text-green-600">
+                              <Fingerprint className="w-3 h-3" />
+                              <span className="text-[9px] font-bold">Enrolled</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 text-amber-500">
+                              <AlertCircle className="w-3 h-3" />
+                              <span className="text-[9px] font-bold">Pending</span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-4 px-6 w-[20%] overflow-hidden">
+                           <span className="text-[10px] text-slate-500 truncate block">{student.college_email}</span>
+                        </td>
+                        <td className="py-4 px-6 w-[15%] text-right">
+                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                <button 
+                                  onClick={() => handleResetFace(student.id)}
+                                  title="Reset Face Data"
+                                  className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                                >
+                                    <RotateCcw className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteStudent(student.id)}
+                                  title="Remove Student"
+                                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white p-20 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center animate-fade-in">
+              <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
+                  <AlertCircle className="w-10 h-10 text-slate-300" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 mb-2">Module Under Construction</h3>
+              <p className="text-slate-500 max-w-sm">
+                  The {menuItems.find(i => i.id === activeTab).label} module is being updated. Full management features will be live soon.
+              </p>
+              <button 
+                onClick={() => setActiveTab('attendance')}
+                className="mt-8 px-8 py-3 bg-slate-900 text-white font-bold rounded-xl shadow-lg shadow-slate-200 hover:bg-slate-800 transition-all"
+              >
+                Back to Attendance
+              </button>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+</div>
+  );
+};
+
+export default AdminDashboard;

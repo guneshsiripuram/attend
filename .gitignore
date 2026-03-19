@@ -1,0 +1,26 @@
+# Node modules
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Environment variables (Critical Security)
+.env
+client/.env
+client/.env.local
+client/.env.production
+server/.env
+
+# Build outputs
+dist/
+client/dist/
+
+# OS files
+.DS_Store
+thumbs.db
+
+# Misc
+.vercel/
+.netlify/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
