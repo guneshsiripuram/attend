@@ -1,5 +1,5 @@
-require('dotenv').config();
-const express = require('express');
+require('dotenv').config(); // v1.0.1 Deploy
+const express = require('express'); // v1.0.1 Auth Fix
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const path = require('path');

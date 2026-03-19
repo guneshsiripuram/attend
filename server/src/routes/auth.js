@@ -1,4 +1,4 @@
-const express = require('express');
+const express = require('express'); // v1.0.1 Auth Ready
 const { query } = require('../db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
