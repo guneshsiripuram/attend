@@ -15,6 +15,7 @@ const StudentDashboard = ({ user }) => {
   const [history, setHistory] = useState([]);
   const [stats, setStats] = useState({ percentage: 0, present: 0, total: 30 });
   const [rollNumber, setRollNumber] = useState('');
+  const [branch, setBranch] = useState('');
   const [section, setSection] = useState('');
   const [currLocation, setCurrLocation] = useState(null);
   const [cameraError, setCameraError] = useState('');
@@ -65,8 +66,8 @@ const StudentDashboard = ({ user }) => {
     const imageToVerify = manualImage || webcamRef.current.getScreenshot();
     if (!imageToVerify) return;
 
-    if (!rollNumber || !section) {
-      setResult({ success: false, message: 'Please enter both Roll Number and Section' });
+    if (!rollNumber || !section || !branch) {
+      setResult({ success: false, message: 'Please enter Roll Number, Branch and Section' });
       return;
     }
 
@@ -86,6 +87,7 @@ const StudentDashboard = ({ user }) => {
           isAuto: true,
           rollNumber,
           section,
+          branch,
           location: { lat, lng }
         });
         setResult({ success: true, message: resp.data.message });
@@ -128,13 +130,13 @@ const StudentDashboard = ({ user }) => {
 
   // Adaptive Auto-Verify Loop
   React.useEffect(() => {
-    if (isAutoMode && rollNumber && section && !result?.success && !isVerifying) {
+    if (isAutoMode && rollNumber && section && branch && !result?.success && !isVerifying) {
       autoVerifyTimeout.current = setTimeout(() => {
         handleVerify();
       }, 1500); // 1.5s delay *between* scans for smoothness
     }
     return () => clearTimeout(autoVerifyTimeout.current);
-  }, [isAutoMode, rollNumber, section, result, isVerifying]);
+  }, [isAutoMode, rollNumber, section, branch, result, isVerifying]);
 
   const chartData = [
     { name: 'Present', value: stats.present },
@@ -222,7 +224,7 @@ const StudentDashboard = ({ user }) => {
            <div className="text-center">
              <h1 className="text-3xl font-bold text-slate-900">Mark Attendance</h1>
              <div className="mt-4 flex flex-col items-center gap-2">
-               {isAutoMode && rollNumber && section && !result?.success ? (
+               {isAutoMode && rollNumber && section && branch && !result?.success ? (
                  <p className="text-primary-600 font-bold animate-pulse flex items-center justify-center gap-2 uppercase tracking-wider">
                    <Loader2 className="w-5 h-5 animate-spin" />
                    Auto-Scanning for your face...
@@ -234,7 +236,7 @@ const StudentDashboard = ({ user }) => {
                )}
              </div>
            </div>
- 
+  
            <div className="relative w-full max-w-lg aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-2xl ring-4 ring-white/50">
               <Webcam
                 audio={false}
@@ -267,7 +269,7 @@ const StudentDashboard = ({ user }) => {
                   <p className="text-sm text-red-500 font-bold">{cameraError}</p>
                 </div>
               )}
- 
+  
              <div className={`absolute inset-0 border-8 transition-colors duration-500 pointer-events-none rounded-2xl ${
                isVerifying ? 'border-primary-500/50' : (result?.success ? 'border-green-500/50' : 'border-slate-800/10')
              }`} />
@@ -278,7 +280,7 @@ const StudentDashboard = ({ user }) => {
                 </div>
              )}
            </div>
- 
+  
            <div className="w-full max-w-lg flex flex-col gap-4">
              <div className="grid grid-cols-3 gap-4 w-full">
                <input
@@ -290,12 +292,8 @@ const StudentDashboard = ({ user }) => {
                />
                <select
                  className="w-full px-4 py-4 border-2 border-slate-100 rounded-2xl focus:border-primary-500 outline-none text-center font-bold text-lg bg-white appearance-none"
-                 value={section.split('-')[0] || ''}
-                 onChange={(e) => {
-                   const branch = e.target.value;
-                   const letter = section.split('-')[1] || 'A';
-                   setSection(`${branch}-${letter}`);
-                 }}
+                 value={branch}
+                 onChange={(e) => setBranch(e.target.value)}
                >
                  <option value="" disabled>Branch</option>
                   {BRANCHES.map(b => (
@@ -305,12 +303,8 @@ const StudentDashboard = ({ user }) => {
                </select>
                <select
                  className="w-full px-4 py-4 border-2 border-slate-100 rounded-2xl focus:border-primary-500 outline-none text-center font-bold text-lg bg-white appearance-none"
-                 value={section.split('-')[1] || ''}
-                 onChange={(e) => {
-                   const branch = section.split('-')[0] || 'CSE';
-                   const letter = e.target.value;
-                   setSection(`${branch}-${letter}`);
-                 }}
+                 value={section}
+                 onChange={(e) => setSection(e.target.value)}
                >
                  <option value="" disabled>Sec</option>
                   {SECTIONS.map(s => (
@@ -319,7 +313,7 @@ const StudentDashboard = ({ user }) => {
 
                </select>
              </div>
- 
+  
              {result && (
                <div className={`p-4 rounded-2xl flex items-center gap-4 animate-fade-in ${
                  result.success ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
@@ -328,12 +322,12 @@ const StudentDashboard = ({ user }) => {
                  <p className="font-medium">{result.message}</p>
                </div>
              )}
- 
+  
              <button
                onClick={() => handleVerify()}
-               disabled={isVerifying || !rollNumber || !section || result?.success}
+               disabled={isVerifying || !rollNumber || !section || !branch || result?.success}
                className={`w-full py-4 rounded-2xl font-bold shadow-xl flex items-center justify-center gap-3 transition-all ${
-                 isVerifying || !rollNumber || !section || result?.success
+                 isVerifying || !rollNumber || !section || !branch || result?.success
                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
                  : 'bg-primary-600 hover:bg-primary-700 text-white shadow-primary-200 active:scale-95'
                }`}
