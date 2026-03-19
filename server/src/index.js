@@ -10,7 +10,7 @@ const adminRoutes = require('./routes/admin');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'COLLEGE_DOMAIN', 'CAMPUS_LAT', 'CAMPUS_LNG', 'MAX_DISTANCE_METERS'];
+const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'COLLEGE_DOMAIN', 'CAMPUS_LAT', 'CAMPUS_LNG', 'MAX_DISTANCE_METERS', 'GOOGLE_CLIENT_ID'];
 
 const missingEnv = REQUIRED_ENV.filter(env => !process.env[env]);
 if (missingEnv.length > 0) {
@@ -26,10 +26,15 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    // allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+    
+    // Normalize origins for comparison
+    const formattedOrigin = origin.replace(/\/$/, "");
+    const formattedAllowed = allowedOrigins.map(o => o.replace(/\/$/, ""));
+
+    if (formattedAllowed.indexOf(formattedOrigin) === -1) {
+      const msg = `CORS Error: Origin ${origin} not allowed. Approved: ${allowedOrigins.join(', ')}`;
+      console.error(msg);
       return callback(new Error(msg), false);
     }
     return callback(null, true);

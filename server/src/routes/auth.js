@@ -9,11 +9,16 @@ const router = express.Router();
 
 // Google Login
 router.post('/google-login', async (req, res) => {
-  const { credential } = req.body;
+  const { token, credential } = req.body;
+  const idToken = token || credential;
+
+  if (!idToken) {
+    return res.status(400).json({ message: 'Google token is required' });
+  }
   
   try {
     const ticket = await client.verifyIdToken({
-      idToken: credential,
+      idToken: idToken,
       audience: process.env.GOOGLE_CLIENT_ID
     });
     
