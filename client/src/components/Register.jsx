@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import Webcam from 'react-webcam';
 import { User, Mail, Lock, UserPlus, AlertCircle, Camera, CheckCircle, Loader2 } from 'lucide-react';
 import { BRANCHES, SECTIONS, COLLEGE_DOMAIN } from '../constants';
+import FaceService from '../services/FaceService';
 
 
 const Register = () => {
@@ -73,6 +74,10 @@ const Register = () => {
     setIsRecording(false);
   };
 
+  React.useEffect(() => {
+    FaceService.loadModels().then(() => setIsCameraReady(true));
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -83,26 +88,34 @@ const Register = () => {
       return;
     }
 
-    const emailToTest = formData.college_email.trim().toLowerCase();
-    const isSpecialAdmin = currentRole === 'admin' && emailToTest === 'raghumail';
-    const isDomainOk = emailToTest.endsWith(COLLEGE_DOMAIN.toLowerCase());
-    
-    if (currentRole === 'student' && !isDomainOk) {
-      setError(`Only ${COLLEGE_DOMAIN} emails are allowed for students.`);
-      return;
-    }
-
     setLoading(true);
     try {
-      const resp = await axios.post('/auth/register', {
+      let face_descriptor = null;
+
+      if (currentRole === 'student') {
+        const descriptors = [];
+        console.log(`Processing ${capturedFrames.length} frames locally...`);
+        for (const frame of capturedFrames) {
+          const desc = await FaceService.getDescriptorFromBase64(frame);
+          if (desc) descriptors.push(desc);
+        }
+
+        if (descriptors.length === 0) {
+          throw new Error('No face detected in the recording. Please try again with better lighting.');
+        }
+
+        face_descriptor = FaceService.averageDescriptors(descriptors);
+      }
+
+      await axios.post('/auth/register', {
         ...formData,
-        images: capturedFrames 
+        face_descriptor 
       });
 
       setSuccess('Account created successfully! Redirecting to login...');
       setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed');
+      setError(err.response?.data?.message || err.message || 'Registration failed');
     } finally {
       setLoading(false);
     }

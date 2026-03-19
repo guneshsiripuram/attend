@@ -1,50 +1,47 @@
-# 🚀 The Golden Path Deployment Guide
+# 🚀 Golden Path Deployment (Option 2: No Card Needed)
 
-I've evaluated all methods and this is the **most stable, free, and easiest way** to get your project live.
+This guide takes you through deploying your Attendance Portal for **FREE** without needing a credit card.
 
-## Step 1: Push Code to GitHub
-Since your terminal doesn't see `git`, the easiest way is using a windowed app:
-1. **Download GitHub Desktop**: [desktop.github.com](https://desktop.github.com/).
-2. **Add Local Repository**: Point it to your `attendance` folder.
-3. **Publish to GitHub**: Click "Publish Repository" to create a PRIVATE or PUBLIC repo on your GitHub account.
+## 1. Push Code to GitHub
+1. Open **GitHub Desktop**.
+2. Make sure all your changes are committed.
+3. Click **Push origin** to sync your code to GitHub.
 
----
-
-## Step 2: Backend -> Render (Always stable with Docker)
-Render will use the `Dockerfile` I created to handle your face recognition AI perfectly.
-1. **Go to [Render.com](https://render.com/)** and sign in with GitHub.
+## 2. Deploy Backend (Render) - 100% Free
+1. Go to [Render.com](https://render.com/) and log in with GitHub.
 2. Click **New +** > **Web Service**.
-3. Connect your repository.
-4. **Settings**:
-   - Runtime: **Docker** (Render will auto-detect).
-5. **Environment Variables**: Add these from your `server/.env`:
-   - `DATABASE_URL`: (Your Neon DB link)
-   - `JWT_SECRET`: (Any secure word)
-   - `FRONTEND_URL`: (You will get this from Netlify in Step 3)
-   - `CAMPUS_LAT`, `CAMPUS_LNG`, `MAX_DISTANCE_METERS`: (Copy from `.env`)
-6. **Wait for Deploy**: It will give you a URL like `https://attendance-api.onrender.com`.
+3. Select your `attend` repository.
+4. Settings:
+   - **Name**: `attend-api`
+   - **Root Directory**: `server`
+   - **Environment**: `Node`
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+   - **Instance Type**: **Free** (No credit card required!)
+5. **Environment Variables** (Add these):
+   - `DATABASE_URL`: (Your Neon DB URL)
+   - `JWT_SECRET`: (Anything random)
+   - `FRONTEND_URL`: (We will get this from Netlify next)
+   - `PORT`: `10000`
+   - `COLLEGE_DOMAIN`: `@raghuenggcollege.in`
+   - `CAMPUS_LAT`: `17.925615`
+   - `CAMPUS_LNG`: `83.424361`
+   - `MAX_DISTANCE_METERS`: `100`
 
----
-
-## Step 3: Frontend -> Netlify (Fast & Easy)
-Netlify will host your website and talk to the Render backend.
-1. **Go to [Netlify.com](https://app.netlify.com/)** and sign in with GitHub.
+## 3. Deploy Frontend (Netlify) - 100% Free
+1. Go to [Netlify.com](https://www.netlify.com/) and log in with GitHub.
 2. Click **Add new site** > **Import an existing project**.
-3. Import your repo.
-4. **Build Settings**:
-   - Base directory: `client`
-   - Build command: `npm run build`
-   - Publish directory: `dist`
+3. Select your `attend` repository.
+4. Settings:
+   - **Base directory**: `client`
+   - **Build command**: `npm run build`
+   - **Publish directory**: `client/dist`
 5. **Environment Variables**:
-   - Add `VITE_API_URL`: Use your Render URL + `/api` (e.g., `https://attendance-api.onrender.com/api`).
-6. **Deploy**!
+   - `VITE_API_URL`: (Your Render API URL, e.g., `https://attend-api.onrender.com/api`)
+6. Click **Deploy**.
+
+## 4. Final Link
+Once your Netlify site is live (e.g., `https://your-app.netlify.app`), go back to **Render** and update the `FRONTEND_URL` environment variable to match your Netlify URL.
 
 ---
-
-## Final Step: Loop the URLs
-1. Copy your new **Netlify URL** (e.g., `https://your-site.netlify.app`).
-2. Go back to your **Render** settings and update the `FRONTEND_URL` variable to match it.
-
-**You're live!** 🎉
-Check out your Netlify link to see your project on the internet.
-unlink(file:///c:/Users/LENOVO/OneDrive/Desktop/attendance/README_DEPLOY.md)
+**Congratulations! Your app is now live and secure.**

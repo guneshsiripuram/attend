@@ -4,6 +4,7 @@ import axios from 'axios';
 import { Camera, MapPin, CheckCircle, XCircle, Loader2, Calendar, Percent } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { BRANCHES, SECTIONS } from '../constants';
+import FaceService from '../services/FaceService';
 
 
 const StudentDashboard = ({ user }) => {
@@ -52,8 +53,14 @@ const StudentDashboard = ({ user }) => {
     return () => clearInterval(locInterval);
   }, []);
 
+  const [isModelsLoaded, setIsModelsLoaded] = useState(false);
+
+  React.useEffect(() => {
+    FaceService.loadModels().then(() => setIsModelsLoaded(true));
+  }, []);
+
   const handleVerify = async (manualImage = null) => {
-    if (isVerifying) return;
+    if (isVerifying || !isModelsLoaded) return;
     
     const imageToVerify = manualImage || webcamRef.current.getScreenshot();
     if (!imageToVerify) return;
@@ -63,14 +70,19 @@ const StudentDashboard = ({ user }) => {
       return;
     }
 
-
     setIsVerifying(true);
     
     // Helper for actual API call
     const performVerify = async (lat, lng) => {
       try {
+        // Option 2: Extract descriptor locally
+        const descriptor = await FaceService.getDescriptorFromBase64(imageToVerify);
+        if (!descriptor) {
+          throw new Error('No face detected. Please ensure your face is clearly visible.');
+        }
+
         const resp = await axios.post('/attendance/verify', {
-          image: imageToVerify,
+          face_descriptor: descriptor,
           isAuto: true,
           rollNumber,
           section,
@@ -80,7 +92,7 @@ const StudentDashboard = ({ user }) => {
         fetchHistory();
         setIsAutoMode(false); 
       } catch (err) {
-        const errorMsg = err.response?.data?.message || 'Verification failed';
+        const errorMsg = err.response?.data?.message || err.message || 'Verification failed';
         setResult({ success: false, message: errorMsg });
         
         // Stop auto-mode for terminal errors like Identity mismatch

@@ -2,8 +2,6 @@ const express = require('express');
 const { query } = require('../db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { getEmbedding, getMultipleEmbeddings } = require('../utils/faceEngine');
-const { base64ToBuffer } = require('../utils/fileUtils');
 
 
 const router = express.Router();
@@ -43,23 +41,9 @@ router.post('/register', async (req, res) => {
   }
 
   try {
-    let finalEmbedding = null;
+    let finalEmbedding = face_descriptor; // Accept direct descriptor from client
+    
     console.log('Registering user role:', normalizedRole, 'Email:', emailLower);
-
-    // If images array is provided (new multi-frame flow)
-    if (req.body.images && Array.isArray(req.body.images) && req.body.images.length > 0) {
-      console.log(`Extracting robust embedding from ${req.body.images.length} frames...`);
-      const buffers = req.body.images.map(img => base64ToBuffer(img));
-
-      finalEmbedding = await getMultipleEmbeddings(buffers);
-    } 
-    // Fallback for single image
-    else if (image) {
-      console.log('Extracting embedding for registration (single image)...');
-      const buffer = base64ToBuffer(image);
-      const faceResult = await getEmbedding(buffer);
-      finalEmbedding = faceResult?.descriptor || null;
-    }
 
     if (!finalEmbedding && normalizedRole === 'student') {
       console.log('Face validation failed for student');

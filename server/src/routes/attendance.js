@@ -1,8 +1,6 @@
 const express = require('express');
 const { query } = require('../db');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
-const { getEmbedding, compareEmbeddings } = require('../utils/faceEngine');
-const { base64ToBuffer } = require('../utils/fileUtils');
 
 
 const router = express.Router();
@@ -69,53 +67,15 @@ router.post('/verify', authMiddleware, async (req, res) => {
 
 
 
-    // 3. Process Live Images
-    let liveEmbedding = null;
+    // 3. Process Live Identity (Option 2: Direct Descriptor from Client)
+    const { face_descriptor } = req.body;
     
-    // Fast-path for single-image "Auto-Verify"
-    if (req.body.image) {
-      console.log(`[DEBUG] Executing single-image fast-path...`);
-      const buffer = base64ToBuffer(req.body.image);
-
-      const processStartTime = Date.now();
-      const faceResult = await getEmbedding(buffer);
-      console.log(`[DEBUG] Fast-path processing took ${Date.now() - processStartTime}ms`);
-      
-      if (!faceResult) {
-        return res.status(400).json({ message: 'No face detected.' });
-      }
-      liveEmbedding = faceResult.descriptor;
-    } 
-    // Legacy 3-pose liveness check
-    else if (images && images.straight && images.left && images.right) {
-      const poses = ['straight', 'left', 'right'];
-      const processStartTime = Date.now();
-      const faceResults = await Promise.all(poses.map(async (targetPose) => {
-        const buffer = base64ToBuffer(images[targetPose]);
-
-        const faceResult = await getEmbedding(buffer);
-        return { targetPose, faceResult };
-      }));
-
-      console.log(`[DEBUG] Parallel processing took ${Date.now() - processStartTime}ms`);
-
-      const results = {};
-      for (const { targetPose, faceResult } of faceResults) {
-        if (!faceResult) return res.status(400).json({ message: `No face detected in ${targetPose}.` });
-        if (faceResult.pose !== targetPose) {
-          return res.status(403).json({ message: `Liveness failed: ${targetPose} pose incorrect.` });
-        }
-        results[targetPose] = faceResult.descriptor;
-      }
-      liveEmbedding = results.straight;
-    } else {
+    if (!face_descriptor) {
       return res.status(400).json({ message: 'Missing facial data for verification.' });
     }
 
-    console.log(`[DEBUG] All 3 poses verified. Starting facial comparison...`);
-    // 4. Compare Embeddings (using the straight image for the primary match)
+    // 4. Compare Embeddings
     let storedEmbedding = user.face_embedding;
-    console.log(`[DEBUG] Raw Stored Type: ${typeof storedEmbedding}`);
     
     if (typeof storedEmbedding === 'string') {
         try {
@@ -125,17 +85,17 @@ router.post('/verify', authMiddleware, async (req, res) => {
         }
     }
 
-    // Handle both array and { descriptor: [...] } formats
     const finalStored = Array.isArray(storedEmbedding) ? storedEmbedding : (storedEmbedding?.descriptor || storedEmbedding);
     
-    console.log(`[DEBUG] Comparing Embeddings: Stored length=${finalStored?.length}, Live length=${liveEmbedding?.length}`);
-    
-    if (!finalStored || !liveEmbedding) {
-      throw new Error(`Embedding missing or invalid format: Stored=${!!finalStored}, Live=${!!liveEmbedding}`);
+    if (!finalStored) {
+      throw new Error(`Registered face embedding missing in database for user ${userId}`);
     }
 
-    const similarity = compareEmbeddings(finalStored, liveEmbedding);
-    console.log(`[DEBUG] Similarity score: ${similarity.toFixed(4)}`);
+    const { compareDescriptors } = require('../utils/faceUtils');
+    const faceDistance = compareDescriptors(finalStored, face_descriptor);
+    const similarity = 1 - faceDistance; 
+    
+    console.log(`[DEBUG] Comparison: FaceDistance=${faceDistance.toFixed(4)}, Similarity=${similarity.toFixed(4)}`);
     const threshold = 0.60;
 
     if (similarity < threshold) {
