@@ -23,7 +23,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 
 // Verify Attendance
 router.post('/verify', authMiddleware, async (req, res) => {
-  const { images, location, rollNumber, section } = req.body; // images is object, location is { lat, lng }
+  const { face_descriptor, location, rollNumber, section } = req.body; 
   const userId = req.user.id;
 
   try {

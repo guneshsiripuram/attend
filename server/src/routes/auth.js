@@ -11,7 +11,7 @@ router.post('/register', async (req, res) => {
   console.log('--- REGISTRATION REQUEST START ---');
   console.log('Body:', { ...req.body, images: req.body.images ? `${req.body.images.length} frames` : 'none' });
   
-  let { full_name, roll_number, section, branch, college_email, password, role, face_embedding, image } = req.body;
+  let { full_name, roll_number, section, branch, college_email, password, role, face_descriptor, face_embedding, image } = req.body;
   
   // Normalize role
   const normalizedRole = (role || 'student').toLowerCase().trim();
