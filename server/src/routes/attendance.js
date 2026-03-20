@@ -102,7 +102,10 @@ router.post('/verify', authMiddleware, async (req, res) => {
     const finalStored = Array.isArray(storedEmbedding) ? storedEmbedding : (storedEmbedding?.descriptor || storedEmbedding);
     
     if (!finalStored) {
-      throw new Error(`Registered face embedding missing in database for user ${userId}`);
+      return res.status(400).json({ 
+        message: 'Face enrollment required. Please register your face first.',
+        needsEnrollment: true 
+      });
     }
 
     const { compareDescriptors } = require('../utils/faceUtils');

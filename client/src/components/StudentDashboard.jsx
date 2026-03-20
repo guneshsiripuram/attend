@@ -1,4 +1,5 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Webcam from 'react-webcam';
 import axios from 'axios';
 import { Camera, MapPin, CheckCircle, XCircle, Loader2, Calendar, Percent, Shield as ShieldIcon } from 'lucide-react';
@@ -7,6 +8,7 @@ import { BRANCHES, SECTIONS } from '../constants';
 import FaceService from '../services/FaceService';
 
 const StudentDashboard = ({ user }) => {
+  const navigate = useNavigate();
   const webcamRef = useRef(null);
   const [isAutoMode, setIsAutoMode] = useState(true);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -378,7 +380,17 @@ const StudentDashboard = ({ user }) => {
                   result.success ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
                 }`}>
                   {result.success ? <CheckCircle className="w-6 h-6" /> : <XCircle className="w-6 h-6" />}
-                  <p className="font-medium">{result.message}</p>
+                  <div className="flex-1">
+                    <p className="font-medium">{result.message}</p>
+                    {result.message.includes('enrollment required') && (
+                      <button 
+                        onClick={() => navigate('/register', { state: { googleUser: user } })}
+                        className="mt-2 text-sm font-bold bg-white text-red-600 px-4 py-2 rounded-xl shadow-sm hover:bg-red-100 transition-colors"
+                      >
+                        Register Now →
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
    

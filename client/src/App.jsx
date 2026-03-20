@@ -54,7 +54,7 @@ const App = () => {
         <main className="container mx-auto px-4 py-8">
           <Routes>
             <Route path="/login" element={!user ? <Login onLogin={login} /> : <Navigate to={user.role === 'admin' ? '/admin' : '/student'} />} />
-            <Route path="/register" element={!user ? <Register /> : <Navigate to="/" />} />
+            <Route path="/register" element={!user || user.role === 'student' ? <Register /> : <Navigate to="/" />} />
             
             <Route 
               path="/student" 
