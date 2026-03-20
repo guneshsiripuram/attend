@@ -27,6 +27,20 @@ router.post('/verify', authMiddleware, async (req, res) => {
   const userId = req.user.id;
 
   try {
+    // 0. Session Gatekeeper Check
+    const sessionResult = await query("SELECT is_open, expires_at FROM portal_settings WHERE id = 1");
+    const session = sessionResult.rows[0];
+    
+    if (!session.is_open) {
+      return res.status(403).json({ message: 'Attendance portal is currently CLOSED by the faculty.' });
+    }
+    
+    if (session.expires_at && new Date() > new Date(session.expires_at)) {
+      // Auto-close if expired
+      await query("UPDATE portal_settings SET is_open = FALSE WHERE id = 1");
+      return res.status(403).json({ message: 'Attendance session has EXPIRED.' });
+    }
+
     // 1. Fetch user data (including roll_number, section and embedding)
     const userResult = await query('SELECT roll_number, section, face_embedding FROM users WHERE id = $1', [userId]);
     const user = userResult.rows[0];

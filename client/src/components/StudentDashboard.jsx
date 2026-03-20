@@ -1,11 +1,10 @@
 import React, { useState, useRef, useCallback } from 'react';
 import Webcam from 'react-webcam';
 import axios from 'axios';
-import { Camera, MapPin, CheckCircle, XCircle, Loader2, Calendar, Percent } from 'lucide-react';
+import { Camera, MapPin, CheckCircle, XCircle, Loader2, Calendar, Percent, Shield as ShieldIcon } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { BRANCHES, SECTIONS } from '../constants';
 import FaceService from '../services/FaceService';
-
 
 const StudentDashboard = ({ user }) => {
   const webcamRef = useRef(null);
@@ -21,6 +20,10 @@ const StudentDashboard = ({ user }) => {
   const [cameraError, setCameraError] = useState('');
   const [isCameraReady, setIsCameraReady] = useState(false);
   const autoVerifyTimeout = useRef(null);
+  
+  // Session Gates
+  const [session, setSession] = useState({ is_open: false, expires_at: null });
+  const [isSessionLoading, setIsSessionLoading] = useState(true);
 
   const fetchHistory = useCallback(async () => {
     try {
@@ -56,12 +59,26 @@ const StudentDashboard = ({ user }) => {
 
   const [isModelsLoaded, setIsModelsLoaded] = useState(false);
 
+  const fetchSession = async () => {
+    try {
+      const resp = await axios.get('/admin/session'); // Students can also read public session status
+      setSession(resp.data);
+    } catch (err) {
+      console.error('Failed to fetch session', err);
+    } finally {
+      setIsSessionLoading(false);
+    }
+  };
+
   React.useEffect(() => {
     FaceService.loadModels().then(() => setIsModelsLoaded(true));
+    fetchSession();
+    const interval = setInterval(fetchSession, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleVerify = async (manualImage = null) => {
-    if (isVerifying || !isModelsLoaded) return;
+    if (isVerifying || !isModelsLoaded || !session.is_open) return;
     
     const imageToVerify = manualImage || webcamRef.current.getScreenshot();
     if (!imageToVerify) return;
@@ -73,10 +90,8 @@ const StudentDashboard = ({ user }) => {
 
     setIsVerifying(true);
     
-    // Helper for actual API call
     const performVerify = async (lat, lng) => {
       try {
-        // Option 2: Extract descriptor locally
         const descriptor = await FaceService.getDescriptorFromBase64(imageToVerify);
         if (!descriptor) {
           throw new Error('No face detected. Please ensure your face is clearly visible.');
@@ -97,7 +112,6 @@ const StudentDashboard = ({ user }) => {
         const errorMsg = err.response?.data?.message || err.message || 'Verification failed';
         setResult({ success: false, message: errorMsg });
         
-        // Stop auto-mode for terminal errors like Identity mismatch
         if (err.response?.status === 403) {
           setIsAutoMode(false);
         }
@@ -106,7 +120,6 @@ const StudentDashboard = ({ user }) => {
       }
     };
 
-    // Use cached location or fetch once
     if (currLocation) {
       await performVerify(currLocation.lat, currLocation.lng);
     } else if (navigator.geolocation) {
@@ -130,13 +143,13 @@ const StudentDashboard = ({ user }) => {
 
   // Adaptive Auto-Verify Loop
   React.useEffect(() => {
-    if (isAutoMode && rollNumber && section && branch && !result?.success && !isVerifying) {
+    if (isAutoMode && rollNumber && section && branch && !result?.success && !isVerifying && session.is_open) {
       autoVerifyTimeout.current = setTimeout(() => {
         handleVerify();
-      }, 1500); // 1.5s delay *between* scans for smoothness
+      }, 1500);
     }
     return () => clearTimeout(autoVerifyTimeout.current);
-  }, [isAutoMode, rollNumber, section, branch, result, isVerifying]);
+  }, [isAutoMode, rollNumber, section, branch, result, isVerifying, session.is_open]);
 
   const chartData = [
     { name: 'Present', value: stats.present },
@@ -221,139 +234,170 @@ const StudentDashboard = ({ user }) => {
        {/* Right Column: Camera & verification */}
        <div className="lg:col-span-2">
          <div className="glass p-8 rounded-3xl shadow-2xl flex flex-col items-center gap-8 min-h-[600px]">
-           <div className="text-center">
-             <h1 className="text-3xl font-bold text-slate-900">Mark Attendance</h1>
-             <div className="mt-4 flex flex-col items-center gap-2">
-               {isAutoMode && rollNumber && section && branch && !result?.success ? (
-                 <p className="text-primary-600 font-bold animate-pulse flex items-center justify-center gap-2 uppercase tracking-wider">
-                   <Loader2 className="w-5 h-5 animate-spin" />
-                   Auto-Scanning for your face...
-                 </p>
-               ) : (
-                 <p className="text-slate-500 text-sm">
-                   {result?.success ? 'Attendance verified successfully' : 'Enter your details to start scanning'}
-                 </p>
-               )}
-             </div>
-           </div>
+            <div className="text-center">
+              <h1 className="text-3xl font-bold text-slate-900">Mark Attendance</h1>
+              <div className="mt-4 flex flex-col items-center gap-2">
+                {!session.is_open && !isSessionLoading ? (
+                  <div className="flex flex-col items-center gap-2 animate-bounce">
+                     <p className="text-red-500 font-black flex items-center gap-2 uppercase tracking-tighter bg-red-50 px-4 py-2 rounded-full border border-red-100">
+                        <XCircle className="w-5 h-5" />
+                        Portal is CLOSED
+                     </p>
+                     <p className="text-slate-400 text-xs font-medium italic">Wait for faculty to open the gate</p>
+                  </div>
+                ) : isAutoMode && rollNumber && section && branch && !result?.success ? (
+                  <p className="text-primary-600 font-bold animate-pulse flex items-center justify-center gap-2 uppercase tracking-wider">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Auto-Scanning for your face...
+                  </p>
+                ) : (
+                  <div className="flex flex-col items-center gap-1">
+                    {session.is_open && (
+                       <p className="text-green-600 font-black text-xs uppercase tracking-widest bg-green-50 px-3 py-1 rounded-full border border-green-100 mb-1">
+                          ● Portal Open
+                       </p>
+                    )}
+                    <p className="text-slate-500 text-sm">
+                      {result?.success ? 'Attendance verified successfully' : 'Enter your details to start scanning'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
   
-           <div className="relative w-full max-w-lg aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-2xl ring-4 ring-white/50">
-              <Webcam
-                audio={false}
-                ref={webcamRef}
-                screenshotFormat="image/jpeg"
-                className="w-full h-full object-cover"
-                videoConstraints={{ facingMode: "user" }}
-                onUserMedia={() => { setIsCameraReady(true); setCameraError(''); }}
-                onUserMediaError={(err) => {
-                  console.error("Camera Error:", err);
-                  setIsCameraReady(false);
-                  if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                    setCameraError('Camera access denied.');
-                  } else {
-                    setCameraError('Camera blocked or not found.');
-                  }
-                }}
-              />
-              
-              {!isCameraReady && !cameraError && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/50">
-                  <Loader2 className="w-10 h-10 text-primary-500 animate-spin mb-2" />
-                  <p className="text-sm text-slate-400">Starting Camera...</p>
-                </div>
-              )}
-
-              {cameraError && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 p-6 text-center">
-                  <Camera className="w-10 h-10 text-red-500 mb-2" />
-                  <p className="text-sm text-red-500 font-bold">{cameraError}</p>
-                </div>
-              )}
-  
-             <div className={`absolute inset-0 border-8 transition-colors duration-500 pointer-events-none rounded-2xl ${
-               isVerifying ? 'border-primary-500/50' : (result?.success ? 'border-green-500/50' : 'border-slate-800/10')
-             }`} />
-             
-             {isVerifying && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                    <Loader2 className="w-12 h-12 text-white animate-spin" />
-                </div>
-             )}
-           </div>
-  
-           <div className="w-full max-w-lg flex flex-col gap-4">
-             <div className="grid grid-cols-3 gap-4 w-full">
-               <input
-                 type="text"
-                 placeholder="Roll Number"
-                 className="w-full px-4 py-4 border-2 border-slate-100 rounded-2xl focus:border-primary-500 outline-none text-center font-bold text-lg tracking-widest uppercase col-span-1"
-                 value={rollNumber}
-                 onChange={(e) => setRollNumber(e.target.value.toUpperCase())}
+            <div className="relative w-full max-w-lg aspect-video bg-slate-900 rounded-2xl overflow-hidden shadow-2xl ring-4 ring-white/50">
+               <Webcam
+                 audio={false}
+                 ref={webcamRef}
+                 screenshotFormat="image/jpeg"
+                 className="w-full h-full object-cover"
+                 videoConstraints={{ facingMode: "user" }}
+                 onUserMedia={() => { setIsCameraReady(true); setCameraError(''); }}
+                 onUserMediaError={(err) => {
+                   console.error("Camera Error:", err);
+                   setIsCameraReady(false);
+                   if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                     setCameraError('Camera access denied.');
+                   } else {
+                     setCameraError('Camera blocked or not found.');
+                   }
+                 }}
                />
-               <select
-                 className="w-full px-4 py-4 border-2 border-slate-100 rounded-2xl focus:border-primary-500 outline-none text-center font-bold text-lg bg-white appearance-none"
-                 value={branch}
-                 onChange={(e) => setBranch(e.target.value)}
-               >
-                 <option value="" disabled>Branch</option>
-                  {BRANCHES.map(b => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
-
-               </select>
-               <select
-                 className="w-full px-4 py-4 border-2 border-slate-100 rounded-2xl focus:border-primary-500 outline-none text-center font-bold text-lg bg-white appearance-none"
-                 value={section}
-                 onChange={(e) => setSection(e.target.value)}
-               >
-                 <option value="" disabled>Sec</option>
-                  {SECTIONS.map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-
-               </select>
-             </div>
-  
-             {result && (
-               <div className={`p-4 rounded-2xl flex items-center gap-4 animate-fade-in ${
-                 result.success ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
-               }`}>
-                 {result.success ? <CheckCircle className="w-6 h-6" /> : <XCircle className="w-6 h-6" />}
-                 <p className="font-medium">{result.message}</p>
-               </div>
-             )}
-  
-             <button
-               onClick={() => handleVerify()}
-               disabled={isVerifying || !rollNumber || !section || !branch || result?.success}
-               className={`w-full py-4 rounded-2xl font-bold shadow-xl flex items-center justify-center gap-3 transition-all ${
-                 isVerifying || !rollNumber || !section || !branch || result?.success
-                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
-                 : 'bg-primary-600 hover:bg-primary-700 text-white shadow-primary-200 active:scale-95'
-               }`}
-             >
-               {isVerifying ? (
-                 <>
-                   <Loader2 className="w-6 h-6 animate-spin" />
-                   <span>Identifying...</span>
-                 </>
-               ) : (
-                 <>
-                   <MapPin className="w-6 h-6" />
-                   <span>{result?.success ? 'Attendance Marked' : 'Scan Now and Submit'}</span>
-                 </>
+               
+               {!isCameraReady && !cameraError && (
+                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/50">
+                   <Loader2 className="w-10 h-10 text-primary-500 animate-spin mb-2" />
+                   <p className="text-sm text-slate-400">Starting Camera...</p>
+                 </div>
                )}
-             </button>
-             
-             {result?.success && (
-                <button 
-                    onClick={() => { setResult(null); setIsAutoMode(true); }}
-                    className="text-primary-600 text-sm font-semibold hover:underline"
+ 
+               {cameraError && (
+                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 p-6 text-center">
+                   <Camera className="w-10 h-10 text-red-500 mb-2" />
+                   <p className="text-sm text-red-500 font-bold">{cameraError}</p>
+                 </div>
+               )}
+   
+              <div className={`absolute inset-0 border-8 transition-colors duration-500 pointer-events-none rounded-2xl ${
+                isVerifying ? 'border-primary-500/50' : (result?.success ? 'border-green-500/50' : 'border-slate-800/10')
+              }`} />
+              
+              {isVerifying && (
+                 <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                     <Loader2 className="w-12 h-12 text-white animate-spin" />
+                 </div>
+              )}
+
+              {!session.is_open && !isSessionLoading && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/10 backdrop-blur-[2px] p-6 text-center z-20">
+                   <div className="bg-white/95 p-8 rounded-[2rem] shadow-2xl border border-slate-200/50 flex flex-col items-center gap-4 max-w-xs animate-in zoom-in-95 duration-300">
+                      <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center shadow-inner">
+                         <ShieldIcon className="w-8 h-8 text-red-500" />
+                      </div>
+                      <div>
+                         <h3 className="text-xl font-black text-slate-900">Gate is Locked</h3>
+                         <p className="text-slate-500 text-sm leading-relaxed mt-2">
+                           Verification is disabled until the faculty starts a session.
+                         </p>
+                      </div>
+                   </div>
+                </div>
+              )}
+            </div>
+   
+            <div className="w-full max-w-lg flex flex-col gap-4">
+              <div className="grid grid-cols-3 gap-4 w-full">
+                <input
+                  type="text"
+                  placeholder="Roll Number"
+                  className="w-full px-4 py-4 border-2 border-slate-100 rounded-2xl focus:border-primary-500 outline-none text-center font-bold text-lg tracking-widest uppercase col-span-1"
+                  value={rollNumber}
+                  onChange={(e) => setRollNumber(e.target.value.toUpperCase())}
+                />
+                <select
+                  className="w-full px-4 py-4 border-2 border-slate-100 rounded-2xl focus:border-primary-500 outline-none text-center font-bold text-lg bg-white appearance-none"
+                  value={branch}
+                  onChange={(e) => setBranch(e.target.value)}
                 >
-                    Mark Another Attendance
-                </button>
-             )}
-           </div>
+                  <option value="" disabled>Branch</option>
+                   {BRANCHES.map(b => (
+                     <option key={b} value={b}>{b}</option>
+                   ))}
+ 
+                </select>
+                <select
+                  className="w-full px-4 py-4 border-2 border-slate-100 rounded-2xl focus:border-primary-500 outline-none text-center font-bold text-lg bg-white appearance-none"
+                  value={section}
+                  onChange={(e) => setSection(e.target.value)}
+                >
+                  <option value="" disabled>Sec</option>
+                   {SECTIONS.map(s => (
+                     <option key={s} value={s}>{s}</option>
+                   ))}
+ 
+                </select>
+              </div>
+   
+              {result && (
+                <div className={`p-4 rounded-2xl flex items-center gap-4 animate-fade-in ${
+                  result.success ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
+                }`}>
+                  {result.success ? <CheckCircle className="w-6 h-6" /> : <XCircle className="w-6 h-6" />}
+                  <p className="font-medium">{result.message}</p>
+                </div>
+              )}
+   
+              <button
+                onClick={() => handleVerify()}
+                disabled={isVerifying || !rollNumber || !section || !branch || result?.success || !session.is_open}
+                className={`w-full py-4 rounded-2xl font-bold shadow-xl flex items-center justify-center gap-3 transition-all ${
+                  isVerifying || !rollNumber || !section || !branch || result?.success || !session.is_open
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
+                  : 'bg-primary-600 hover:bg-primary-700 text-white shadow-primary-200 active:scale-95'
+                }`}
+              >
+                {isVerifying ? (
+                  <>
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                    <span>Identifying...</span>
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="w-6 h-6" />
+                    <span>{!session.is_open && !isSessionLoading ? 'Gate Locked' : result?.success ? 'Attendance Marked' : 'Scan Now and Submit'}</span>
+                  </>
+                )}
+              </button>
+ 
+              {result?.success && (
+                 <button 
+                     onClick={() => { setResult(null); setIsAutoMode(true); }}
+                     className="text-primary-600 text-sm font-semibold hover:underline"
+                 >
+                     Mark Another Attendance
+                 </button>
+              )}
+            </div>
          </div>
        </div>
     </div>

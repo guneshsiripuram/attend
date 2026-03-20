@@ -177,4 +177,36 @@ router.get('/attendance/history', authMiddleware, adminMiddleware, async (req, r
   }
 });
 
+// Get Current Session Status
+router.get('/session', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const result = await query("SELECT is_open, expires_at FROM portal_settings WHERE id = 1");
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('SESSION_GET_ERROR:', error);
+    res.status(500).json({ message: 'Error fetching session status' });
+  }
+});
+
+// Toggle Session (Open/Close)
+router.post('/session/toggle', authMiddleware, adminMiddleware, async (req, res) => {
+  const { isOpen, durationMinutes } = req.body;
+  try {
+    let expiresAt = null;
+    if (isOpen && durationMinutes) {
+      expiresAt = new Date(Date.now() + durationMinutes * 60000);
+    }
+    
+    await query(
+      "UPDATE portal_settings SET is_open = $1, expires_at = $2, updated_at = CURRENT_TIMESTAMP WHERE id = 1",
+      [isOpen, expiresAt]
+    );
+    
+    res.json({ message: `Attendance gate ${isOpen ? 'OPEN' : 'CLOSED'}`, expiresAt });
+  } catch (error) {
+    console.error('SESSION_TOGGLE_ERROR:', error);
+    res.status(500).json({ message: 'Error toggling session' });
+  }
+});
+
 module.exports = router;

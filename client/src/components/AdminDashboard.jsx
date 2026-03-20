@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Filter, Download, Users, CheckCircle, Clock, AlertCircle, Shield, LogOut, ChevronRight, UserPlus, Settings, Database, RotateCcw, Trash2, Fingerprint, X, History } from 'lucide-react';
+import { Search, Filter, Download, Users, CheckCircle, Clock, AlertCircle, Shield, LogOut, ChevronRight, UserPlus, Settings, Database, RotateCcw, Trash2, Fingerprint, X, History, Loader2, MapPin } from 'lucide-react';
 import AttendanceHistory from './AttendanceHistory';
 import { BRANCHES, SECTIONS } from '../constants';
 
@@ -37,9 +37,23 @@ const AdminDashboard = () => {
     section: '',
     password: 'password123' // Default password
   });
+  
+  // Session Gate States
+  const [session, setSession] = useState({ is_open: false, expires_at: null });
+  const [sessionLoading, setSessionLoading] = useState(false);
+
+  const fetchSession = async () => {
+    try {
+      const resp = await axios.get('/admin/session');
+      setSession(resp.data);
+    } catch (err) {
+      console.error('Failed to fetch session', err);
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
+    fetchSession(); // Also fetch session status
     try {
       if (activeTab === 'attendance') {
         const { name, email, date, branch, section, rollNumber } = filters;
@@ -71,6 +85,22 @@ const AdminDashboard = () => {
     filters.date, filters.name, filters.branch, filters.section, filters.rollNumber,
     studentFilters.name, studentFilters.rollNumber, studentFilters.branch, studentFilters.section
   ]);
+
+  // Handle Session Toggle
+  const handleToggleSession = async (minutes) => {
+    setSessionLoading(true);
+    try {
+      const resp = await axios.post('/admin/session/toggle', {
+        isOpen: !session.is_open,
+        durationMinutes: !session.is_open ? minutes : null
+      });
+      setSession({ is_open: !session.is_open, expires_at: resp.data.expiresAt });
+    } catch (err) {
+      alert('Failed to update session');
+    } finally {
+      setSessionLoading(false);
+    }
+  };
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -588,6 +618,90 @@ const AdminDashboard = () => {
                 </tbody>
               </table>
             </div>
+          </div>
+        ) : activeTab === 'settings' ? (
+          <div className="bg-white p-8 md:p-12 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 max-w-4xl mx-auto animate-in zoom-in-95 duration-500">
+             <div className="flex flex-col md:flex-row items-center gap-12">
+                <div className="flex-1 space-y-6">
+                   <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-600 rounded-2xl font-black text-xs uppercase tracking-widest border border-primary-100">
+                      <Shield className="w-4 h-4" />
+                      Security Gate Control
+                   </div>
+                   <h2 className="text-4xl font-black text-slate-900 leading-tight">
+                      Manage Attendance <span className="text-primary-600">Access</span>
+                   </h2>
+                   <p className="text-slate-500 text-lg leading-relaxed">
+                      Control exactly when students can mark their attendance. Opening the "Gate" allows AI verification to proceed.
+                   </p>
+                   
+                   <div className="pt-6 space-y-4">
+                      {session.is_open ? (
+                        <div className="space-y-6">
+                           <div className="p-6 bg-green-50 border-2 border-green-100 rounded-3xl flex items-center justify-between animate-pulse">
+                              <div className="flex items-center gap-4">
+                                 <div className="w-12 h-12 bg-green-500 rounded-2xl flex items-center justify-center shadow-lg shadow-green-200">
+                                    <Clock className="w-6 h-6 text-white" />
+                                 </div>
+                                 <div>
+                                    <p className="text-green-800 font-black text-lg">GATE IS OPEN</p>
+                                    <p className="text-green-600 text-sm font-bold">Students can now mark attendance</p>
+                                 </div>
+                              </div>
+                              {session.expires_at && (
+                                <div className="text-right">
+                                   <p className="text-xs font-bold text-green-700 uppercase">Closes at</p>
+                                   <p className="text-xl font-black text-green-800">{new Date(session.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                </div>
+                              )}
+                           </div>
+                           <button 
+                             onClick={() => handleToggleSession(null)}
+                             disabled={sessionLoading}
+                             className="w-full py-5 bg-red-500 text-white font-black rounded-3xl shadow-xl shadow-red-100 hover:bg-red-600 transition-all transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3"
+                           >
+                             <LogOut className="w-6 h-6 rotate-180" />
+                             FORCE CLOSE GATE NOW
+                           </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-8">
+                           <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl flex items-center gap-4">
+                              <div className="w-12 h-12 bg-slate-200 rounded-2xl flex items-center justify-center">
+                                 <Shield className="w-6 h-6 text-slate-500" />
+                              </div>
+                              <div>
+                                 <p className="text-slate-800 font-black text-lg uppercase tracking-tight">Gate is Closed</p>
+                                 <p className="text-slate-400 text-sm font-medium">Select a duration to start the session</p>
+                              </div>
+                           </div>
+                           
+                           <div className="grid grid-cols-3 gap-4">
+                              {[5, 10, 15].map(mins => (
+                                <button
+                                  key={mins}
+                                  onClick={() => handleToggleSession(mins)}
+                                  disabled={sessionLoading}
+                                  className="flex flex-col items-center gap-2 p-6 bg-white border-2 border-slate-100 rounded-[2rem] hover:border-primary-500 hover:bg-primary-50 transition-all group shadow-sm hover:shadow-xl hover:shadow-primary-100/50"
+                                >
+                                   <div className="w-12 h-12 bg-slate-50 group-hover:bg-primary-500 rounded-2xl flex items-center justify-center transition-colors">
+                                      <Clock className="w-6 h-6 text-slate-400 group-hover:text-white" />
+                                   </div>
+                                   <span className="font-black text-slate-400 group-hover:text-primary-700">{mins} MINS</span>
+                                </button>
+                              ))}
+                           </div>
+                        </div>
+                      )}
+                   </div>
+                </div>
+                <div className="hidden lg:block w-72 h-72 relative">
+                   <div className={`absolute inset-0 rounded-full border-8 transition-colors duration-1000 ${session.is_open ? 'border-green-500 animate-ping opacity-20' : 'border-slate-100'}`}></div>
+                   <div className={`absolute inset-0 m-4 rounded-full border-4 border-dashed animate-spin-slow ${session.is_open ? 'border-green-400 opacity-40' : 'border-slate-200'}`}></div>
+                   <div className={`absolute inset-0 m-12 rounded-full flex items-center justify-center shadow-inner ${session.is_open ? 'bg-green-50' : 'bg-slate-50'}`}>
+                      <Fingerprint className={`w-20 h-20 ${session.is_open ? 'text-green-500' : 'text-slate-200'}`} />
+                   </div>
+                </div>
+             </div>
           </div>
         ) : (
           <div className="bg-white p-20 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center animate-fade-in">
