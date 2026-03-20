@@ -46,8 +46,8 @@ router.post('/verify', authMiddleware, async (req, res) => {
     const existingLog = await query(
       `SELECT id FROM attendance_logs 
        WHERE user_id = $1 AND status = 'Present' 
-       AND timestamp::date = CURRENT_DATE 
-       AND (CASE WHEN EXTRACT(HOUR FROM timestamp) < 12 THEN 'Morning' ELSE 'Afternoon' END) = $2`,
+       AND "timestamp"::date = CURRENT_DATE 
+       AND (CASE WHEN EXTRACT(HOUR FROM "timestamp") < 12 THEN 'Morning' ELSE 'Afternoon' END) = $2`,
       [userId, currentSession]
     );
 
@@ -176,7 +176,7 @@ router.get('/me', authMiddleware, async (req, res) => {
     );
     
     // Calculate stats dynamic based on unique capture days in system
-    const dayCountResult = await query('SELECT COUNT(DISTINCT timestamp::date) as count FROM attendance_logs');
+    const dayCountResult = await query('SELECT COUNT(DISTINCT "timestamp"::date) as count FROM attendance_logs');
     const totalDays = parseInt(dayCountResult.rows[0].count) || 1; 
 
     // Full-day logic: Must have at least one morning (<12) AND one afternoon (>=12) log
