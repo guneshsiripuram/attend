@@ -21,6 +21,7 @@ if (missingEnv.length > 0) {
 // Middleware
 const allowedOrigins = [
   'http://localhost:5173',
+  'http://localhost:5174',
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
@@ -32,6 +33,7 @@ app.use(cors({
     // 2. Define known valid origins (including current frontend)
     const validOrigins = [
       'http://localhost:5173',
+      'http://localhost:5174',
       'https://stdatd.netlify.app',
       'https://stdadt.netlify.app',
       process.env.FRONTEND_URL

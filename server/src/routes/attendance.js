@@ -110,13 +110,13 @@ router.post('/verify', authMiddleware, async (req, res) => {
     const similarity = 1 - faceDistance; 
     
     console.log(`[DEBUG] Comparison: FaceDistance=${faceDistance.toFixed(4)}, Similarity=${similarity.toFixed(4)}`);
-    const threshold = 0.60;
+    const threshold = 0.40;
 
     if (similarity < threshold) {
       console.log(`[DEBUG] Match failed: ${similarity} < ${threshold}`);
       await query(
         'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',
-        [userId, rollNumber, section, 'Failed_Match', JSON.stringify(location)]
+        [userId, rollNumber, section, 'Failed_Match', JSON.stringify({ ...location, similarity: similarity.toFixed(4) })]
       );
       return res.status(403).json({ message: 'Facial recognition failed. Face does not match registered profile.', similarity });
     }
