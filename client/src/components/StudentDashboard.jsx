@@ -211,7 +211,7 @@ const StudentDashboard = ({ user }) => {
           </div>
         </div>
 
-        <div className="glass p-6 rounded-2xl shadow-lg flex-1 h-[400px] overflow-hidden flex flex-col">
+        <div className="glass p-6 rounded-2xl shadow-lg h-[450px] overflow-hidden flex flex-col">
           <h2 className="text-xl font-bold flex items-center gap-2 mb-4">
             <Calendar className="text-primary-600 w-5 h-5" />
             Recent Logs
