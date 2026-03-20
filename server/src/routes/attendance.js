@@ -31,7 +31,7 @@ router.post('/verify', authMiddleware, async (req, res) => {
     const sessionResult = await query("SELECT is_open, expires_at FROM portal_settings WHERE id = 1");
     const session = sessionResult.rows[0];
     
-    if (!session.is_open) {
+    if (!session || !session.is_open) {
       return res.status(403).json({ message: 'Attendance portal is currently CLOSED by the faculty.' });
     }
     

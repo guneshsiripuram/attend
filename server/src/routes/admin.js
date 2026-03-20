@@ -180,12 +180,12 @@ router.get('/attendance/history', authMiddleware, adminMiddleware, async (req, r
 // Session Gate Controls (GET allowed for all auth users, POST for admins only)
 router.get('/session', authMiddleware, async (req, res) => {
   try {
-    const result = await query('SELECT is_open, expires_at FROM portal_settings LIMIT 1');
+    const result = await query('SELECT is_open, expires_at FROM portal_settings WHERE id = 1');
     let session = result.rows[0];
 
     // Auto-expiration check in GET route to prevent desync
     if (session && session.is_open && session.expires_at && new Date() > new Date(session.expires_at)) {
-      await query('UPDATE portal_settings SET is_open = false, expires_at = NULL, updated_at = CURRENT_TIMESTAMP');
+      await query('UPDATE portal_settings SET is_open = false, expires_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = 1');
       session = { ...session, is_open: false, expires_at: null };
       console.log('--- SESSION AUTO-CLOSED (EXPIRED) ---');
     }

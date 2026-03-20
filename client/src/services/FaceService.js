@@ -27,7 +27,7 @@ class FaceService {
     if (!this.modelsLoaded) await this.loadModels();
 
     const detection = await faceapi
-      .detectSingleFace(imageElement)
+      .detectSingleFace(imageElement, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }))
       .withFaceLandmarks()
       .withFaceDescriptor();
 
