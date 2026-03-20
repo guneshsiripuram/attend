@@ -14,7 +14,7 @@ router.get('/attendance/all', authMiddleware, adminMiddleware, async (req, res) 
     SELECT al.id, al.timestamp, al.status, u.full_name, u.college_email, u.roll_number, u.section, u.branch
     FROM attendance_logs al
     JOIN users u ON al.user_id = u.id
-    WHERE 1=1
+    WHERE al.status = 'Present'
   `;
   const params = [];
 
@@ -158,6 +158,7 @@ router.get('/attendance/history', authMiddleware, adminMiddleware, async (req, r
         ) ORDER BY al.timestamp DESC) as present_records
       FROM attendance_logs al
       JOIN users u ON al.user_id = u.id
+      WHERE al.status = 'Present'
       GROUP BY DATE(al.timestamp)
       ORDER BY DATE(al.timestamp) DESC
     `;
