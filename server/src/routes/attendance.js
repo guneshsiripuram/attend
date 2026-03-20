@@ -69,14 +69,18 @@ router.post('/verify', authMiddleware, async (req, res) => {
 
     console.log(`[DEBUG] User Location: ${location.lat}, ${location.lng}`);
     console.log(`[DEBUG] Campus Center: ${campusLat}, ${campusLng}`);
-    console.log(`[DEBUG] Calculated Distance: ${distance.toFixed(2)}m (Max: ${process.env.MAX_DISTANCE_METERS}m)`);
+    console.log(`[DEBUG] Calculated Distance: ${distance.toFixed(2)}m (Max: ${MAX_DISTANCE}m)`);
 
-    if (distance > parseFloat(process.env.MAX_DISTANCE_METERS)) {
+    if (!isInside) {
       await query(
         'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',
-        [userId, rollNumber, section, 'Failed_Location', JSON.stringify(location)]
+        [userId, rollNumber, section, 'Location_Denied', JSON.stringify({ ...location, distance, maxDistance: MAX_DISTANCE })]
       );
-      return res.status(403).json({ message: 'Location verification failed. You must be on campus.', distance: distance.toFixed(2) });
+      return res.status(403).json({ 
+        message: 'Location verification failed. You must be on campus.',
+        distance,
+        maxDistance: MAX_DISTANCE
+      });
     }
 
 
