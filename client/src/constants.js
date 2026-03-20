@@ -2,7 +2,7 @@
  * Centralized constants for the frontend
  */
 
-export const BRANCHES = ['CSE', 'ECE', 'EEE', 'ME', 'CE', 'IT'];
+export const BRANCHES = ['CSE', 'ECE', 'EEE', 'MECH', 'CIVIL', 'AI&ML', 'IT'];
 export const SECTIONS = ['A', 'B', 'C', 'D'];
 
 export const COLLEGE_DOMAIN = '@raghuenggcollege.in';

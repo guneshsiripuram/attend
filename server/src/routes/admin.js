@@ -213,8 +213,12 @@ router.post('/session/toggle', authMiddleware, adminMiddleware, async (req, res)
     
     res.json({ message: `Attendance gate ${isOpen ? 'OPEN' : 'CLOSED'}`, expiresAt });
   } catch (error) {
-    console.error('SESSION_TOGGLE_ERROR:', error);
-    res.status(500).json({ message: 'Error toggling session' });
+    console.error('--- SESSION_TOGGLE_ERROR ---');
+    console.error('Error details:', error.message);
+    res.status(500).json({ 
+      message: 'Error toggling session',
+      error: error.message 
+    });
   }
 });
 
