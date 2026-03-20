@@ -67,6 +67,9 @@ router.post('/verify', authMiddleware, async (req, res) => {
     const campusLng = parseFloat(process.env.CAMPUS_LNG);
     const distance = calculateDistance(location.lat, location.lng, campusLat, campusLng);
 
+    const MAX_DISTANCE = parseFloat(process.env.MAX_DISTANCE_METERS || '200');
+    const isInside = distance <= MAX_DISTANCE;
+
     console.log(`[DEBUG] User Location: ${location.lat}, ${location.lng}`);
     console.log(`[DEBUG] Campus Center: ${campusLat}, ${campusLng}`);
     console.log(`[DEBUG] Calculated Distance: ${distance.toFixed(2)}m (Max: ${MAX_DISTANCE}m)`);
