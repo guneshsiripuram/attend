@@ -96,9 +96,14 @@ const StudentDashboard = ({ user }) => {
     
     const performVerify = async (lat, lng) => {
       try {
-        const descriptor = await FaceService.getDescriptorFromBase64(imageToVerify);
+        let descriptor = await FaceService.getDescriptorFromBase64(imageToVerify);
         if (!descriptor) {
           throw new Error('No face detected. Please ensure your face is clearly visible.');
+        }
+
+        // Convert Float32Array to plain array for JSON serialization
+        if (descriptor instanceof Float32Array || typeof descriptor.length === 'number') {
+          descriptor = Array.from(descriptor);
         }
 
         const resp = await axios.post('/attendance/verify', {

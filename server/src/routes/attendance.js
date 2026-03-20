@@ -109,6 +109,11 @@ router.post('/verify', authMiddleware, async (req, res) => {
     }
 
     const { compareDescriptors } = require('../utils/faceUtils');
+    
+    // Detailed logging for debugging
+    console.log(`[DEBUG] FinalStored: type=${typeof finalStored}, isArray=${Array.isArray(finalStored)}, len=${finalStored?.length}`);
+    console.log(`[DEBUG] ProvidedDescriptor: type=${typeof face_descriptor}, isArray=${Array.isArray(face_descriptor)}, len=${face_descriptor?.length}`);
+    
     const faceDistance = compareDescriptors(finalStored, face_descriptor);
     const similarity = 1 - faceDistance; 
     
