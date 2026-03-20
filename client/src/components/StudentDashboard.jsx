@@ -61,12 +61,14 @@ const StudentDashboard = ({ user }) => {
 
   const fetchSession = async () => {
     try {
-      const resp = await axios.get('/admin/session'); // Students can also read public session status
+      const resp = await axios.get('/admin/session'); // Students use the same endpoint (or a read-only one)
       setSession(resp.data);
     } catch (err) {
       console.error('Failed to fetch session', err);
+      // If unauthorized or error, keep it closed to be safe
+      setSession({ is_open: false, expires_at: null, error: true });
     } finally {
-      setIsSessionLoading(false);
+      setSessionLoading(false);
     }
   };
 
@@ -252,11 +254,21 @@ const StudentDashboard = ({ user }) => {
                   </p>
                 ) : (
                   <div className="flex flex-col items-center gap-1">
-                    {session.is_open && (
-                       <p className="text-green-600 font-black text-xs uppercase tracking-widest bg-green-50 px-3 py-1 rounded-full border border-green-100 mb-1">
-                          ● Portal Open
-                       </p>
-                    )}
+                   {session.is_open && (
+                     <div className="flex flex-col items-end gap-1">
+                       <div className="px-4 py-2 bg-white rounded-xl border border-green-200 flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-green-500 animate-ping"></div>
+                          <span className="text-[10px] font-black text-green-600 uppercase">Live</span>
+                       </div>
+                       <p className="text-[9px] text-green-400 font-bold">Synced just now</p>
+                     </div>
+                   )}
+                   {session.error && (
+                     <div className="px-4 py-2 bg-red-50 rounded-xl border border-red-200 flex items-center gap-2">
+                        <XCircle className="w-3 h-3 text-red-500" />
+                        <span className="text-[10px] font-black text-red-600 uppercase">Sync Error</span>
+                     </div>
+                   )}
                     <p className="text-slate-500 text-sm">
                       {result?.success ? 'Attendance verified successfully' : 'Enter your details to start scanning'}
                     </p>

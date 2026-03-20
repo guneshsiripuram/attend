@@ -48,6 +48,7 @@ const AdminDashboard = () => {
       setSession(resp.data);
     } catch (err) {
       console.error('Failed to fetch session', err);
+      setSession(prev => ({ ...prev, error: true }));
     }
   };
 
