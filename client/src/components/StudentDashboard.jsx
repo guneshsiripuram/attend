@@ -224,7 +224,12 @@ const StudentDashboard = ({ user }) => {
                 {history.map((log) => (
                   <div key={log.id} className="p-3 rounded-xl bg-white border border-slate-100 flex items-center justify-between">
                     <div>
-                      <p className="font-semibold text-sm">{new Date(log.timestamp).toLocaleDateString()}</p>
+                      <p className="font-semibold text-sm">
+                        {new Date(log.timestamp).toLocaleDateString()} - 
+                        <span className="ml-1 text-primary-600">
+                          {new Date(log.timestamp).getHours() < 12 ? 'Morning' : 'Afternoon'}
+                        </span>
+                      </p>
                       <p className="text-xs text-slate-500">{new Date(log.timestamp).toLocaleTimeString()}</p>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-xs font-bold ${

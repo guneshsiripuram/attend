@@ -41,6 +41,23 @@ router.post('/verify', authMiddleware, async (req, res) => {
       return res.status(403).json({ message: 'Attendance session has EXPIRED.' });
     }
 
+    // --- SESSION ENFORCEMENT ---
+    const currentSession = new Date().getHours() < 12 ? 'Morning' : 'Afternoon';
+    const existingLog = await query(
+      `SELECT id FROM attendance_logs 
+       WHERE user_id = $1 AND status = 'Present' 
+       AND timestamp::date = CURRENT_DATE 
+       AND (CASE WHEN EXTRACT(HOUR FROM timestamp) < 12 THEN 'Morning' ELSE 'Afternoon' END) = $2`,
+      [userId, currentSession]
+    );
+
+    if (existingLog.rows.length > 0) {
+      return res.status(403).json({ 
+        message: `${currentSession} attendance already marked! Please come back later.` 
+      });
+    }
+    // ---------------------------
+
     // 1. Fetch user data (including roll_number, section and embedding)
     const userResult = await query('SELECT roll_number, section, face_embedding FROM users WHERE id = $1', [userId]);
     const user = userResult.rows[0];
@@ -162,7 +179,19 @@ router.get('/me', authMiddleware, async (req, res) => {
     const dayCountResult = await query('SELECT COUNT(DISTINCT timestamp::date) as count FROM attendance_logs');
     const totalDays = parseInt(dayCountResult.rows[0].count) || 1; 
 
-    const presentDays = result.rows.filter(row => row.status === 'Present').length;
+    // Full-day logic: Must have at least one morning (<12) AND one afternoon (>=12) log
+    const statsByDate = {};
+    result.rows.forEach(log => {
+      if (log.status !== 'Present') return;
+      const dateStr = new Date(log.timestamp).toISOString().split('T')[0];
+      const hour = new Date(log.timestamp).getHours();
+      const session = hour < 12 ? 'morning' : 'afternoon';
+      
+      if (!statsByDate[dateStr]) statsByDate[dateStr] = { morning: false, afternoon: false };
+      statsByDate[dateStr][session] = true;
+    });
+
+    const presentDays = Object.values(statsByDate).filter(day => day.morning && day.afternoon).length;
     const percentage = (presentDays / totalDays) * 100;
 
     res.json({ logs: result.rows, stats: { percentage, present: presentDays, total: totalDays } });
