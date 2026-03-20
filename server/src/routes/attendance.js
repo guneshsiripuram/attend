@@ -158,8 +158,10 @@ router.get('/me', authMiddleware, async (req, res) => {
       [req.user.id]
     );
     
-    // Calculate percentage
-    const totalDays = 30; // Mocking a 30-day semester month for demo
+    // Calculate stats dynamic based on unique capture days in system
+    const dayCountResult = await query('SELECT COUNT(DISTINCT timestamp::date) as count FROM attendance_logs');
+    const totalDays = parseInt(dayCountResult.rows[0].count) || 1; 
+
     const presentDays = result.rows.filter(row => row.status === 'Present').length;
     const percentage = (presentDays / totalDays) * 100;
 

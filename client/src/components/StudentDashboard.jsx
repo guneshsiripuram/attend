@@ -14,7 +14,7 @@ const StudentDashboard = ({ user }) => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [result, setResult] = useState(null);
   const [history, setHistory] = useState([]);
-  const [stats, setStats] = useState({ percentage: 0, present: 0, total: 30 });
+  const [stats, setStats] = useState({ percentage: 0, present: 0, total: 0 });
   const [rollNumber, setRollNumber] = useState('');
   const [branch, setBranch] = useState('');
   const [section, setSection] = useState('');
@@ -205,7 +205,7 @@ const StudentDashboard = ({ user }) => {
               <p className="text-xl font-bold">{stats.present} Days</p>
             </div>
             <div className="p-3 bg-slate-50 rounded-xl">
-              <p className="text-sm text-slate-500 font-semibold">Goal</p>
+              <p className="text-sm text-slate-500 font-semibold">Total Days</p>
               <p className="text-xl font-bold">{stats.total} Days</p>
             </div>
           </div>
