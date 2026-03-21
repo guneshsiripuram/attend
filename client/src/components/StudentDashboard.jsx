@@ -404,10 +404,14 @@ const StudentDashboard = ({ user }) => {
                   {result.success ? <CheckCircle className="w-6 h-6" /> : <XCircle className="w-6 h-6" />}
                   <div className="flex-1 text-center">
                     <p className="font-black text-lg">
-                      {result.success ? 'Identity Verified!' : 'Verification Failed'}
+                      {result.message}
                     </p>
-                    <p className="font-medium text-sm text-green-600">Welcome, {result.student?.name}</p>
-                    <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">{result.student?.rollNumber}</p>
+                    {result.success && result.student?.name && (
+                      <div className="mt-1">
+                        <p className="font-medium text-sm text-green-600">Welcome, {result.student.name}</p>
+                        <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">{result.student.rollNumber}</p>
+                      </div>
+                    )}
                     {result.message?.includes('enrollment required') && (
                       <button 
                         onClick={() => navigate('/register', { state: { googleUser: user } })}

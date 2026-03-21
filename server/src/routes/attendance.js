@@ -32,13 +32,13 @@ router.post('/verify', authMiddleware, async (req, res) => {
     const session = sessionResult.rows[0];
     
     if (!session || !session.is_open) {
-      return res.status(403).json({ message: 'Attendance portal is currently CLOSED by the faculty.' });
+      return res.status(403).json({ message: 'Portal Closed: Faculty has not opened attendance for this session.' });
     }
     
     if (session.expires_at && new Date() > new Date(session.expires_at)) {
       // Auto-close if expired
       await query("UPDATE portal_settings SET is_open = FALSE WHERE id = 1");
-      return res.status(403).json({ message: 'Attendance session has EXPIRED.' });
+      return res.status(403).json({ message: 'Session Expired: The attendance window has closed automatically.' });
     }
 
     // --- SESSION ENFORCEMENT ---
@@ -53,7 +53,7 @@ router.post('/verify', authMiddleware, async (req, res) => {
 
     if (existingLog.rows.length > 0) {
       return res.status(403).json({ 
-        message: `${currentSession} attendance already marked! Please come back later.` 
+        message: `Duplicate Entry: Your ${currentSession} attendance is already recorded.` 
       });
     }
     // ---------------------------
@@ -86,7 +86,7 @@ router.post('/verify', authMiddleware, async (req, res) => {
         [userId, user.roll_number, user.section, 'Location_Denied', JSON.stringify({ ...location, distance, maxDistance: MAX_DISTANCE })]
       );
       return res.status(403).json({ 
-        message: 'Location verification failed. You must be on campus.',
+        message: 'Outside Campus: You must be within the college boundary to mark attendance.',
         distance,
         maxDistance: MAX_DISTANCE
       });
@@ -139,7 +139,7 @@ router.post('/verify', authMiddleware, async (req, res) => {
         'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',
         [userId, user.roll_number, user.section, 'Failed_Match', JSON.stringify({ ...location, similarity: similarity.toFixed(4) })]
       );
-      return res.status(403).json({ message: 'Facial recognition failed. Face does not match registered profile.', similarity });
+      return res.status(403).json({ message: 'Match Failed: Face does not match your registered identity. Ensure good lighting.', similarity });
     }
 
     console.log(`[DEBUG] Verification Successful! Recording attendance...`);
@@ -150,7 +150,7 @@ router.post('/verify', authMiddleware, async (req, res) => {
     );
 
     res.json({ 
-      message: 'Attendance marked successfully!', 
+      message: 'Attendance Marked! Success.', 
       confidence: similarity,
       student: {
         name: user.full_name,
