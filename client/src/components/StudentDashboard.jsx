@@ -63,7 +63,7 @@ const StudentDashboard = ({ user }) => {
   const checkSession = async () => {
     console.log('Checking session...');
     try {
-      const response = await axios.get('/student/session');
+      const response = await axios.get('/attendance/session');
       console.log('Session response:', response.data);
       setSession(response.data);
     } catch (err) {

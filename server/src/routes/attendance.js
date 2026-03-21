@@ -197,4 +197,24 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
+// Get Portal Session Status (Student endpoint)
+router.get('/session', authMiddleware, async (req, res) => {
+  try {
+    const result = await query('SELECT is_open, expires_at FROM portal_settings WHERE id = 1');
+    let session = result.rows[0];
+
+    // Auto-expiration check
+    if (session && session.is_open && session.expires_at && new Date() > new Date(session.expires_at)) {
+      await query('UPDATE portal_settings SET is_open = false, expires_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = 1');
+      session = { ...session, is_open: false, expires_at: null };
+      console.log('--- STUDENT SESSION AUTO-CLOSED (EXPIRED) ---');
+    }
+
+    res.json(session);
+  } catch (err) {
+    console.error('Session fetch error:', err);
+    res.status(500).json({ message: 'Failed to fetch session' });
+  }
+});
+
 module.exports = router;
