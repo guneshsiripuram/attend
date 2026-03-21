@@ -17,14 +17,25 @@ const App = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('App mounting, checking auth status...');
     // Check if user is already logged in
     const storedUser = localStorage.getItem('user');
     const storedToken = localStorage.getItem('token');
     
     if (storedUser && storedToken) {
-      setUser(JSON.parse(storedUser));
-      // Set default header for future requests
-      axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        console.log('Found valid session for:', parsedUser.email);
+        setUser(parsedUser);
+        // Set default header for future requests
+        axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+      } catch (err) {
+        console.error('Failed to parse stored user', err);
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+      }
+    } else {
+      console.log('No stored session found');
     }
     setLoading(false);
   }, []);

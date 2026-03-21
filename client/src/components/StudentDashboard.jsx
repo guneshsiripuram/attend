@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import Webcam from 'react-webcam';
 import axios from 'axios';
 import { Camera, MapPin, CheckCircle, XCircle, Loader2, Calendar, Percent, Shield, Clock, Lock, ShieldCheck } from 'lucide-react';
@@ -23,6 +23,8 @@ const StudentDashboard = ({ user }) => {
   // Session Gates
   const [session, setSession] = useState({ is_open: false, expires_at: null });
   const [isSessionLoading, setIsSessionLoading] = useState(true);
+
+  console.log('StudentDashboard rendering, user:', user?.email);
 
   const fetchHistory = useCallback(async () => {
     try {
@@ -58,10 +60,12 @@ const StudentDashboard = ({ user }) => {
 
   const [isModelsLoaded, setIsModelsLoaded] = useState(false);
 
-  const fetchSession = async () => {
+  const checkSession = async () => {
+    console.log('Checking session...');
     try {
-      const resp = await axios.get('/admin/session'); // Students use the same endpoint (or a read-only one)
-      setSession(resp.data);
+      const response = await axios.get('/student/session');
+      console.log('Session response:', response.data);
+      setSession(response.data);
     } catch (err) {
       console.error('Failed to fetch session', err);
       const msg = err.response?.data?.message || err.message || 'Sync Error';
@@ -73,8 +77,8 @@ const StudentDashboard = ({ user }) => {
 
   React.useEffect(() => {
     FaceService.loadModels().then(() => setIsModelsLoaded(true));
-    fetchSession();
-    const interval = setInterval(fetchSession, 30000);
+    checkSession();
+    const interval = setInterval(checkSession, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -300,11 +304,11 @@ const StudentDashboard = ({ user }) => {
               <div className="mt-4 flex flex-col items-center gap-2">
                 {isAutoMode && !result?.success && session.is_open ? (
                   <p className="text-primary-600 font-black animate-pulse flex items-center justify-center gap-3 uppercase tracking-widest text-xs h-6">
-                    <div className="flex gap-1">
-                       <div className="w-1 h-1 bg-primary-600 rounded-full animate-bounce"></div>
-                       <div className="w-1 h-1 bg-primary-600 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                       <div className="w-1 h-1 bg-primary-600 rounded-full animate-bounce [animation-delay:0.4s]"></div>
-                    </div>
+                    <span className="flex gap-1">
+                       <span className="w-1 h-1 bg-primary-600 rounded-full animate-bounce"></span>
+                       <span className="w-1 h-1 bg-primary-600 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                       <span className="w-1 h-1 bg-primary-600 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+                    </span>
                     Scanning Face...
                   </p>
                 ) : (
@@ -343,7 +347,7 @@ const StudentDashboard = ({ user }) => {
               <div className="absolute bottom-8 right-8 w-8 h-8 border-b-4 border-r-4 border-white/40 rounded-br-lg"></div>
 
               {/* Gate Closed Overlay */}
-              {!session.is_open && !isSessionLoading && (
+              {!isSessionLoading && !session.is_open && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md z-30 transition-all duration-500">
                    <div className="w-20 h-20 bg-slate-900 rounded-3xl flex items-center justify-center mb-6 shadow-2xl border border-white/5 animate-bounce-subtle">
                       <ShieldCheck className="w-10 h-10 text-slate-500" />
