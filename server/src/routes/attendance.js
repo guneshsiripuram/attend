@@ -23,8 +23,10 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 
 // Verify Attendance
 router.post('/verify', authMiddleware, async (req, res) => {
+  console.log('[VERIFY_START] Body:', JSON.stringify(req.body).substring(0, 200) + '...');
   const { face_descriptor, location } = req.body; 
   const userId = req.user.id;
+  console.log('[VERIFY_USER] ID:', userId);
 
   try {
     // 0. Session Gatekeeper Check
@@ -68,9 +70,15 @@ router.post('/verify', authMiddleware, async (req, res) => {
 
     // --- Identity Check Removed (Using Database Ground Truth) ---
 
+    if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') {
+      console.error('[VERIFY_ERROR] Invalid location data:', location);
+      return res.status(400).json({ message: 'Invalid or missing location data.' });
+    }
+
     // 3. Location Check
     const campusLat = parseFloat(process.env.CAMPUS_LAT);
     const campusLng = parseFloat(process.env.CAMPUS_LNG);
+    console.log('[VERIFY_LOCATION_CHECK] Campus:', campusLat, campusLng);
     const distance = calculateDistance(location.lat, location.lng, campusLat, campusLng);
 
     const MAX_DISTANCE = parseFloat(process.env.MAX_DISTANCE_METERS || '200');
@@ -158,8 +166,12 @@ router.post('/verify', authMiddleware, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('[ATTENDANCE_ERROR]:', error);
-    res.status(500).json({ message: 'Server error during verification', details: error.message });
+    console.error('[ATTENDANCE_CRITICAL_ERROR]:', error);
+    res.status(500).json({ 
+      message: 'Server error during verification', 
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined 
+    });
   }
 });
 

@@ -117,8 +117,10 @@ const StudentDashboard = ({ user }) => {
         fetchHistory();
         setIsAutoMode(false); 
       } catch (err) {
+        console.error('Verification error:', err);
         const errorMsg = err.response?.data?.message || err.message || 'Verification failed';
-        setResult({ success: false, message: errorMsg });
+        const details = err.response?.data?.details;
+        setResult({ success: false, message: errorMsg, details });
         
         if (err.response?.status === 403) {
           setIsAutoMode(false);
@@ -406,6 +408,9 @@ const StudentDashboard = ({ user }) => {
                     <p className="font-black text-lg">
                       {result.message}
                     </p>
+                    {result.details && (
+                      <p className="text-[10px] mt-1 opacity-80 italic">Debug: {result.details}</p>
+                    )}
                     {result.success && result.student?.name && (
                       <div className="mt-1">
                         <p className="font-medium text-sm text-green-600">Welcome, {result.student.name}</p>
