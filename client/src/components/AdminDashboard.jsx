@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Filter, Download, Users, CheckCircle, Clock, AlertCircle, Shield, LogOut, ChevronRight, UserPlus, Settings, Database, RotateCcw, Trash2, Fingerprint, X, History, Loader2, MapPin } from 'lucide-react';
+import { Search, Filter, Download, Users, CheckCircle, Clock, AlertCircle, Shield, LogOut, ChevronRight, UserPlus, Settings, Database, RotateCcw, Trash2, Fingerprint, X, History, Loader2, MapPin, UserCheck } from 'lucide-react';
 import AttendanceHistory from './AttendanceHistory';
 import { BRANCHES, SECTIONS } from '../constants';
 
@@ -22,8 +22,10 @@ const AdminDashboard = () => {
     branch: '',
     section: ''
   });
+  const [rosterData, setRosterData] = useState([]);
+  const [rosterSummary, setRosterSummary] = useState({ totalEnrolled: 0, presentCount: 0, absentCount: 0 });
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('attendance');
+  const [activeTab, setActiveTab] = useState('roster');
   
   // New States for Add Student Modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -65,6 +67,15 @@ const AdminDashboard = () => {
         if (resp.data.summary) {
           setSummary(resp.data.summary);
         }
+      } else if (activeTab === 'roster') {
+        const { date, branch, section } = filters;
+        const resp = await axios.get('/admin/attendance/roster', {
+          params: { date, branch, section }
+        });
+        setRosterData(resp.data.data);
+        if (resp.data.summary) {
+          setRosterSummary(resp.data.summary);
+        }
       } else if (activeTab === 'students') {
         const { name, rollNumber, branch, section } = studentFilters;
         const resp = await axios.get('/admin/students', {
@@ -86,6 +97,17 @@ const AdminDashboard = () => {
     filters.date, filters.name, filters.branch, filters.section, filters.rollNumber,
     studentFilters.name, studentFilters.rollNumber, studentFilters.branch, studentFilters.section
   ]);
+
+  // Live polling effect specifically for the roster
+  useEffect(() => {
+    let interval;
+    if (activeTab === 'roster' || activeTab === 'attendance') {
+      interval = setInterval(() => {
+        fetchData();
+      }, 5000); // Poll every 5 seconds for real-time updates
+    }
+    return () => clearInterval(interval);
+  }, [activeTab, filters.date, filters.branch, filters.section]);
 
   // Handle Session Toggle
   const handleToggleSession = async (minutes) => {
@@ -194,6 +216,7 @@ const AdminDashboard = () => {
   };
 
   const menuItems = [
+    { id: 'roster', label: 'Live Roster', icon: UserCheck },
     { id: 'attendance', label: 'Attendance Logs', icon: Clock },
     { id: 'history', label: 'Daily History', icon: History },
     { id: 'students', label: 'Manage Students', icon: Users },
@@ -248,7 +271,9 @@ const AdminDashboard = () => {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
                 <h1 className="text-3xl font-bold text-slate-900 leading-tight">
-                  {activeTab === 'attendance' ? 'Attendance Control Center' : menuItems.find(i => i.id === activeTab).label}
+                  {activeTab === 'attendance' ? 'Attendance Control Center' : 
+                   activeTab === 'roster' ? 'Live Class Roster' :
+                   menuItems.find(i => i.id === activeTab).label}
                 </h1>
                 <p className="text-slate-500 text-sm">System management console & real-time analytics</p>
               </div>
@@ -303,17 +328,51 @@ const AdminDashboard = () => {
                 </div>
               </div>
             )}
+
+            {activeTab === 'roster' && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
+                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                  <div className="p-3 bg-blue-50 rounded-xl">
+                    <Users className="text-blue-600 w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-tight">Total Enrolled</p>
+                    <p className="text-2xl font-bold text-slate-900">{rosterSummary.totalEnrolled || 0}</p>
+                  </div>
+                </div>
+                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 border-l-4 border-l-green-500">
+                  <div className="p-3 bg-green-50 rounded-xl">
+                    <CheckCircle className="text-green-600 w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-green-600 uppercase tracking-tight">Present</p>
+                    <p className="text-2xl font-bold text-slate-900">{rosterSummary.presentCount || 0}</p>
+                  </div>
+                </div>
+                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4 border-l-4 border-l-red-500">
+                  <div className="p-3 bg-red-50 rounded-xl">
+                    <AlertCircle className="text-red-600 w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-red-600 uppercase tracking-tight">Absent / Pending</p>
+                    <p className="text-2xl font-bold text-slate-900">{rosterSummary.absentCount || 0}</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* ATTENDANCE CONTROLS - NOW STABLE IN THE FIXED HEADER */}
-          {activeTab === 'attendance' && (
+          {/* ATTENDANCE CONTROLS - FIXED HEADER */}
+          {(activeTab === 'attendance' || activeTab === 'roster') && (
              <div className="bg-white px-8 pb-4">
                 <div className="max-w-6xl mx-auto bg-slate-50/50 rounded-2xl p-5 border border-slate-100">
                    <div className="flex flex-col gap-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                            <Clock className="w-4 h-4 text-primary-500" />
-                           <h3 className="font-bold text-slate-800 text-sm">Recent Attendance Logs</h3>
+                           <h3 className="font-bold text-slate-800 text-sm">
+                             {activeTab === 'roster' ? 'Select Criteria for Live Roster' : 'Recent Attendance Logs'}
+                           </h3>
                         </div>
                         <input 
                           type="date" 
@@ -376,8 +435,8 @@ const AdminDashboard = () => {
                      <tr>
                        <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[35%]">Student Details</th>
                        <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[15%]">Roll/Sec</th>
-                       <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[20%]">Timestamp</th>
-                       <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[15%] text-center">Status</th>
+                       <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[20%]">{activeTab === 'roster' ? 'Last Attempt' : 'Timestamp'}</th>
+                       <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[15%] text-center">Live Status</th>
                        <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[15%] text-right">Actions</th>
                      </tr>
                    </thead>
@@ -466,7 +525,90 @@ const AdminDashboard = () => {
     {/* Scrollable Logs Section - ONLY ROWS SCROLL NOW */}
     <div className="flex-1 overflow-y-auto px-8 pb-8 custom-scrollbar bg-slate-50/30">
       <div className="max-w-6xl mx-auto py-4">
-        {activeTab === 'attendance' ? (
+        {activeTab === 'roster' ? (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left table-fixed border-separate border-spacing-0">
+                <tbody className="divide-y divide-slate-100">
+                  {loading && rosterData.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="py-20 text-center text-slate-400">
+                        <div className="flex flex-col items-center gap-3">
+                            <Clock className="w-8 h-8 animate-spin text-primary-500" />
+                            <span>Loading Roster...</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : rosterData.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="py-20 text-center text-slate-400 italic font-medium">No students found matching this criteria.</td>
+                    </tr>
+                  ) : (
+                    rosterData.map((row) => {
+                      let statusStyle = 'bg-slate-100 text-slate-500 border-slate-200';
+                      let statusText = 'Absent / Pending';
+                      
+                      if (row.status === 'Present') {
+                        statusStyle = 'bg-green-50 text-green-600 border-green-100';
+                        statusText = 'Present';
+                      } else if (row.status) {
+                        statusStyle = 'bg-red-50 text-red-600 border-red-100';
+                        statusText = row.status.replace('_', ' ');
+                      }
+
+                      return (
+                      <tr key={row.id} className={`hover:bg-slate-50/50 transition-colors group ${row.status === 'Present' ? '' : 'bg-red-50/10'}`}>
+                        <td className="py-4 px-6 w-[35%] overflow-hidden">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 flex-shrink-0 rounded-lg flex items-center justify-center font-black text-xs ${row.status === 'Present' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
+                              {row.full_name.charAt(0)}
+                            </div>
+                            <div className="overflow-hidden">
+                                <span className={`font-bold block text-xs truncate ${row.status === 'Present' ? 'text-slate-800' : 'text-slate-600'}`}>{row.full_name}</span>
+                                <span className="text-[9px] text-slate-400 truncate block">{row.college_email}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 w-[15%]">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono text-[9px] font-bold bg-blue-50 px-1.5 py-0.5 rounded text-blue-600">
+                              {row.roll_number}
+                            </span>
+                            <span className="font-mono text-[9px] font-bold bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
+                              {row.section}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 w-[20%]">
+                          <div className="text-[10px]">
+                            {row.timestamp ? (
+                              <>
+                                <p className="font-bold text-slate-700">{new Date(row.timestamp).toLocaleDateString()}</p>
+                                <p className="text-slate-400">{new Date(row.timestamp).toLocaleTimeString()}</p>
+                              </>
+                            ) : (
+                              <p className="text-slate-400 italic">No attempts yet</p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 w-[15%] text-center">
+                          <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider border inline-block ${statusStyle}`}>
+                            {statusText}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 w-[15%] text-right">
+                          <button className="p-1.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all opacity-0 group-hover:opacity-100">
+                              <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    )})
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : activeTab === 'attendance' ? (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left table-fixed border-separate border-spacing-0">

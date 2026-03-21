@@ -72,6 +72,65 @@ router.get('/attendance/all', authMiddleware, adminMiddleware, async (req, res) 
   }
 });
 
+// Get Live Class Roster (Virtual Approach: Users LEFT JOIN Logs)
+router.get('/attendance/roster', authMiddleware, adminMiddleware, async (req, res) => {
+  const { date, branch, section } = req.query;
+  const targetDate = date || new Date().toISOString().split('T')[0];
+  
+  let q = `
+    SELECT 
+      u.id, 
+      u.full_name, 
+      u.roll_number, 
+      u.college_email,
+      u.branch, 
+      u.section,
+      al.status,
+      al.timestamp
+    FROM users u
+    LEFT JOIN LATERAL (
+      SELECT status, timestamp 
+      FROM attendance_logs 
+      WHERE user_id = u.id 
+        AND "timestamp"::date = $1
+      ORDER BY 
+        CASE WHEN status = 'Present' THEN 1 ELSE 2 END,
+        "timestamp" DESC
+      LIMIT 1
+    ) al ON true
+    WHERE u.role = 'student'
+  `;
+  const params = [targetDate];
+
+  if (branch) {
+    params.push(branch);
+    q += ` AND u.branch = $${params.length}`;
+  }
+  if (section) {
+    params.push(section);
+    q += ` AND u.section = $${params.length}`;
+  }
+
+  q += ` ORDER BY u.roll_number ASC`;
+
+  try {
+    const result = await query(q, params);
+    
+    // Calculate summary stats
+    const totalEnrolled = result.rows.length;
+    const presentCount = result.rows.filter(r => r.status === 'Present').length;
+    const absentCount = totalEnrolled - presentCount;
+
+    res.json({ 
+      data: result.rows,
+      summary: { totalEnrolled, presentCount, absentCount }
+    });
+  } catch (error) {
+    console.error('[ROSTER_API_ERROR]:', error);
+    res.status(500).json({ message: 'Server error fetching live roster' });
+  }
+});
+
 // Get All Students (Manage Students Registry)
 router.get('/students', authMiddleware, adminMiddleware, async (req, res) => {
   const { name, rollNumber, branch, section } = req.query;
