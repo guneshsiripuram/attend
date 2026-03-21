@@ -67,7 +67,7 @@ const StudentDashboard = ({ user }) => {
       const msg = err.response?.data?.message || err.message || 'Sync Error';
       setSession({ is_open: false, expires_at: null, error: true, errorMessage: msg });
     } finally {
-      setSessionLoading(false);
+      setIsSessionLoading(false);
     }
   };
 
@@ -343,7 +343,7 @@ const StudentDashboard = ({ user }) => {
               <div className="absolute bottom-8 right-8 w-8 h-8 border-b-4 border-r-4 border-white/40 rounded-br-lg"></div>
 
               {/* Gate Closed Overlay */}
-              {!session.is_open && !sessionLoading && (
+              {!session.is_open && !isSessionLoading && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md z-30 transition-all duration-500">
                    <div className="w-20 h-20 bg-slate-900 rounded-3xl flex items-center justify-center mb-6 shadow-2xl border border-white/5 animate-bounce-subtle">
                       <ShieldCheck className="w-10 h-10 text-slate-500" />
@@ -399,10 +399,12 @@ const StudentDashboard = ({ user }) => {
                 }`}>
                   {result.success ? <CheckCircle className="w-6 h-6" /> : <XCircle className="w-6 h-6" />}
                   <div className="flex-1 text-center">
-                    <p className="font-black text-lg">Verified successfully!</p>
+                    <p className="font-black text-lg">
+                      {result.success ? 'Identity Verified!' : 'Verification Failed'}
+                    </p>
                     <p className="font-medium text-sm text-green-600">Welcome, {result.student?.name}</p>
                     <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">{result.student?.rollNumber}</p>
-                    {result.message.includes('enrollment required') && (
+                    {result.message?.includes('enrollment required') && (
                       <button 
                         onClick={() => navigate('/register', { state: { googleUser: user } })}
                         className="mt-2 text-sm font-bold bg-white text-red-600 px-4 py-2 rounded-xl shadow-sm hover:bg-red-100 transition-colors"
