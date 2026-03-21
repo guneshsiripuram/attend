@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Webcam from 'react-webcam';
 import axios from 'axios';
-import { Camera, MapPin, CheckCircle, XCircle, Loader2, Calendar, Percent, Shield as ShieldIcon } from 'lucide-react';
+import { Camera, MapPin, CheckCircle, XCircle, Loader2, Calendar, Percent, Shield, Clock, Lock, ShieldCheck } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { BRANCHES, SECTIONS } from '../constants';
 import FaceService from '../services/FaceService';
@@ -86,6 +86,7 @@ const StudentDashboard = ({ user }) => {
 
     
     setIsVerifying(true);
+    setResult(null); // Clear previous results immediately
     
     const performVerify = async (lat, lng) => {
       try {
@@ -240,48 +241,76 @@ const StudentDashboard = ({ user }) => {
       </div>
 
        {/* Right Column: Camera & verification */}
-       <div className="lg:col-span-2">
-         <div className="glass p-8 rounded-3xl shadow-2xl flex flex-col items-center gap-8 min-h-[600px]">
+       <div className="lg:col-span-2 space-y-6">
+         {/* Session Status Banner */}
+         <div className={`p-4 rounded-2xl border-2 flex items-center justify-between transition-all duration-500 shadow-sm ${
+           session.is_open ? 'bg-green-50 border-green-100' : 'bg-amber-50 border-amber-100'
+         }`}>
+           <div className="flex items-center gap-4">
+             <div className={`p-2.5 rounded-xl flex items-center justify-center ${session.is_open ? 'bg-green-500 shadow-lg shadow-green-200' : 'bg-amber-500 shadow-lg shadow-amber-200'}`}>
+               {session.is_open ? <Shield className="w-5 h-5 text-white" /> : <Lock className="w-5 h-5 text-white" />}
+             </div>
+             <div>
+                <p className={`text-sm font-black uppercase tracking-widest ${session.is_open ? 'text-green-700' : 'text-amber-700'}`}>
+                  Portal is {session.is_open ? 'OPEN' : 'CLOSED'}
+                </p>
+                <p className="text-xs font-medium text-slate-500">
+                  {session.is_open 
+                    ? (session.expires_at ? `Automatically closing at ${new Date(session.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Closing soon by faculty') 
+                    : 'Wait for faculty to open the attendance gate'}
+                </p>
+             </div>
+           </div>
+           {session.is_open && (
+             <div className="flex flex-col items-end gap-1">
+               <div className="px-4 py-2 bg-white rounded-xl border border-green-200 flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500 animate-ping"></div>
+                  <span className="text-[10px] font-black text-green-600 uppercase">Live</span>
+               </div>
+               <p className="text-[9px] text-green-400 font-bold">Synced just now</p>
+             </div>
+           )}
+           {session.error && (
+             <div className="px-4 py-2 bg-red-50 rounded-xl border border-red-200 flex flex-col items-center gap-1">
+                <div className="flex items-center gap-2">
+                   <XCircle className="w-3 h-3 text-red-500" />
+                   <span className="text-[10px] font-black text-red-600 uppercase">Sync Error</span>
+                </div>
+                <p className="text-[8px] text-red-400 font-bold">{session.errorMessage}</p>
+             </div>
+           )}
+         </div>
+
+         <div className="glass p-8 rounded-[2.5rem] shadow-2xl flex flex-col items-center gap-8 min-h-[600px] border border-white/50 relative overflow-hidden">
+            {!session.is_open && (
+              <div className="absolute inset-0 z-40 bg-slate-900/5 backdrop-blur-[1px] flex items-center justify-center p-8 transition-opacity duration-500">
+                 <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 max-w-sm text-center space-y-4 transform translate-y-[-20px]">
+                    <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto">
+                       <Lock className="w-8 h-8 text-amber-500" />
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-900">Attendance Gate Locked</h3>
+                    <p className="text-sm text-slate-500 leading-relaxed">
+                      Faculty hasn't opened the attendance portal yet. Please wait until the session begins.
+                    </p>
+                 </div>
+              </div>
+            )}
             <div className="text-center">
-              <h1 className="text-3xl font-bold text-slate-900">Mark Attendance</h1>
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight">AI Identity Verification</h1>
               <div className="mt-4 flex flex-col items-center gap-2">
-                {!session.is_open && !isSessionLoading ? (
-                  <div className="flex flex-col items-center gap-2 animate-bounce">
-                     <p className="text-red-500 font-black flex items-center gap-2 uppercase tracking-tighter bg-red-50 px-4 py-2 rounded-full border border-red-100">
-                        <XCircle className="w-5 h-5" />
-                        Portal is CLOSED
-                     </p>
-                     <p className="text-slate-400 text-xs font-medium italic">Wait for faculty to open the gate</p>
-                  </div>
-                ) : isAutoMode && !result?.success ? (
-                  <p className="text-primary-600 font-bold animate-pulse flex items-center justify-center gap-2 uppercase tracking-wider">
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Auto-Scanning for your face...
+                {isAutoMode && !result?.success && session.is_open ? (
+                  <p className="text-primary-600 font-black animate-pulse flex items-center justify-center gap-3 uppercase tracking-widest text-xs h-6">
+                    <div className="flex gap-1">
+                       <div className="w-1 h-1 bg-primary-600 rounded-full animate-bounce"></div>
+                       <div className="w-1 h-1 bg-primary-600 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                       <div className="w-1 h-1 bg-primary-600 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+                    </div>
+                    Scanning Face...
                   </p>
                 ) : (
-                  <div className="flex flex-col items-center gap-1">
-                   {session.is_open && (
-                     <div className="flex flex-col items-end gap-1">
-                       <div className="px-4 py-2 bg-white rounded-xl border border-green-200 flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-green-500 animate-ping"></div>
-                          <span className="text-[10px] font-black text-green-600 uppercase">Live</span>
-                       </div>
-                       <p className="text-[9px] text-green-400 font-bold">Synced just now</p>
-                     </div>
-                   )}
-                    {session.error && (
-                      <div className="px-4 py-2 bg-red-50 rounded-xl border border-red-200 flex flex-col items-center gap-1">
-                         <div className="flex items-center gap-2">
-                            <XCircle className="w-3 h-3 text-red-500" />
-                            <span className="text-[10px] font-black text-red-600 uppercase">Sync Error</span>
-                         </div>
-                         <p className="text-[8px] text-red-400 font-bold">{session.errorMessage}</p>
-                      </div>
-                    )}
-                    <p className="text-slate-500 text-sm">
-                      {result?.success ? `Verified: ${result.student?.name}` : 'Scanning for your identity...'}
-                    </p>
-                  </div>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest h-6">
+                     {result?.success ? `Verified: ${result.student?.name}` : 'Scanning for your identity...'}
+                  </p>
                 )}
               </div>
             </div>
@@ -305,44 +334,59 @@ const StudentDashboard = ({ user }) => {
                  }}
                />
                
-               {!isCameraReady && !cameraError && (
-                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/50">
-                   <Loader2 className="w-10 h-10 text-primary-500 animate-spin mb-2" />
-                   <p className="text-sm text-slate-400">Starting Camera...</p>
-                 </div>
-               )}
- 
-               {cameraError && (
-                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900 p-6 text-center">
-                   <Camera className="w-10 h-10 text-red-500 mb-2" />
-                   <p className="text-sm text-red-500 font-bold">{cameraError}</p>
-                 </div>
-               )}
+               <div className="absolute inset-0 border-[16px] border-black/10 pointer-events-none"></div>
+              
+              {/* Corner Accents */}
+              <div className="absolute top-8 left-8 w-8 h-8 border-t-4 border-l-4 border-white/40 rounded-tl-lg"></div>
+              <div className="absolute top-8 right-8 w-8 h-8 border-t-4 border-r-4 border-white/40 rounded-tr-lg"></div>
+              <div className="absolute bottom-8 left-8 w-8 h-8 border-b-4 border-l-4 border-white/40 rounded-bl-lg"></div>
+              <div className="absolute bottom-8 right-8 w-8 h-8 border-b-4 border-r-4 border-white/40 rounded-br-lg"></div>
+
+              {/* Gate Closed Overlay */}
+              {!session.is_open && !sessionLoading && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md z-30 transition-all duration-500">
+                   <div className="w-20 h-20 bg-slate-900 rounded-3xl flex items-center justify-center mb-6 shadow-2xl border border-white/5 animate-bounce-subtle">
+                      <ShieldCheck className="w-10 h-10 text-slate-500" />
+                   </div>
+                   <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-2">Portal is CLOSED</h3>
+                   <p className="text-slate-400 text-xs font-bold text-center px-8 leading-relaxed">
+                      This is not the time to take attendance.<br/>
+                      Please check with your faculty for the schedule.
+                   </p>
+                   <div className="mt-8 px-4 py-2 bg-white/5 rounded-full border border-white/10 flex items-center gap-2">
+                      <Clock className="w-3 h-3 text-slate-500" />
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">Access Locked</span>
+                   </div>
+                </div>
+              )}
+
+              {!isCameraReady && !cameraError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950">
+                  <Loader2 className="w-10 h-10 text-primary-500 animate-spin mb-4" />
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Initializing Vision AI</p>
+                </div>
+              )}
+
+              {cameraError && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 p-8 text-center ring-inset ring-2 ring-red-500/20">
+                  <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4">
+                     <Camera className="w-8 h-8 text-red-500" />
+                  </div>
+                  <p className="text-sm text-red-500 font-black uppercase tracking-widest">{cameraError}</p>
+                </div>
+              )}
    
-              <div className={`absolute inset-0 border-8 transition-colors duration-500 pointer-events-none rounded-2xl ${
-                isVerifying ? 'border-primary-500/50' : (result?.success ? 'border-green-500/50' : 'border-slate-800/10')
+              <div className={`absolute inset-0 border-[4px] transition-all duration-700 pointer-events-none ${
+                isVerifying ? 'border-primary-500 animate-pulse' : (result?.success ? 'border-green-500' : 'border-white/5')
               }`} />
               
               {isVerifying && (
-                 <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                     <Loader2 className="w-12 h-12 text-white animate-spin" />
+                 <div className="absolute inset-0 flex items-center justify-center bg-primary-950/20 backdrop-blur-sm">
+                    <div className="flex flex-col items-center gap-4">
+                       <Loader2 className="w-16 h-16 text-white animate-spin" />
+                       <span className="text-white text-xs font-black uppercase tracking-[0.3em]">Processing</span>
+                    </div>
                  </div>
-              )}
-
-              {!session.is_open && !isSessionLoading && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/10 backdrop-blur-[2px] p-6 text-center z-20">
-                   <div className="bg-white/95 p-8 rounded-[2rem] shadow-2xl border border-slate-200/50 flex flex-col items-center gap-4 max-w-xs animate-in zoom-in-95 duration-300">
-                      <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center shadow-inner">
-                         <ShieldIcon className="w-8 h-8 text-red-500" />
-                      </div>
-                      <div>
-                         <h3 className="text-xl font-black text-slate-900">Gate is Locked</h3>
-                         <p className="text-slate-500 text-sm leading-relaxed mt-2">
-                           Verification is disabled until the faculty starts a session.
-                         </p>
-                      </div>
-                   </div>
-                </div>
               )}
             </div>
    
@@ -367,30 +411,30 @@ const StudentDashboard = ({ user }) => {
                       </button>
                     )}
                   </div>
-                </div>
-              )}
+               </div>
+             )}
    
-              <button
-                onClick={() => handleVerify()}
-                disabled={isVerifying || result?.success || !session.is_open}
-                className={`w-full py-4 rounded-2xl font-bold shadow-xl flex items-center justify-center gap-3 transition-all ${
-                  isVerifying || result?.success || !session.is_open
-                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
-                  : 'bg-primary-600 hover:bg-primary-700 text-white shadow-primary-200 active:scale-95'
-                }`}
-              >
-                {isVerifying ? (
-                  <>
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                    <span>Identifying...</span>
-                  </>
-                ) : (
-                  <>
-                    <MapPin className="w-6 h-6" />
-                    <span>{!session.is_open && !isSessionLoading ? 'Gate Locked' : result?.success ? 'Attendance Marked' : 'Scan Now and Submit'}</span>
-                  </>
-                )}
-              </button>
+             <button
+               onClick={() => handleVerify()}
+               disabled={isVerifying || result?.success || !session.is_open}
+               className={`w-full py-5 rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-2xl flex items-center justify-center gap-4 transition-all transform active:scale-95 ${
+                 isVerifying || result?.success || !session.is_open
+                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' 
+                 : 'bg-primary-600 hover:bg-primary-700 text-white shadow-primary-200 hover:shadow-primary-300/50'
+               }`}
+             >
+               {isVerifying ? (
+                 <>
+                   <Loader2 className="w-6 h-6 animate-spin" />
+                   <span>Verifying</span>
+                 </>
+               ) : (
+                 <>
+                   <MapPin className="w-6 h-6" />
+                   <span>{result?.success ? 'Fulfilled' : 'Confirm Attendance'}</span>
+                 </>
+               )}
+             </button>
  
               {result?.success && (
                  <button 
