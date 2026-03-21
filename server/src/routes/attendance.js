@@ -91,12 +91,11 @@ router.post('/verify', authMiddleware, async (req, res) => {
     if (!isInside) {
       await query(
         'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',
-        [userId, user.roll_number, user.section, 'Location_Denied', JSON.stringify({ ...location, distance, maxDistance: MAX_DISTANCE })]
+        [userId, user.roll_number, user.section, 'Failed_Location', JSON.stringify({ ...location, distance, maxDistance: MAX_DISTANCE })]
       );
       return res.status(403).json({ 
-        message: 'Outside Campus: You must be within the college boundary to mark attendance.',
-        distance,
-        maxDistance: MAX_DISTANCE
+        message: `Outside Campus: ${distance.toFixed(2)}m away`,
+        details: `You are currently ${distance.toFixed(2)}m away from the campus gate. Maximum allowed is ${MAX_DISTANCE}m.`
       });
     }
 
@@ -145,9 +144,9 @@ router.post('/verify', authMiddleware, async (req, res) => {
       console.log(`[DEBUG] Match failed: ${similarity} < ${threshold}`);
       await query(
         'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',
-        [userId, user.roll_number, user.section, 'Failed_Match', JSON.stringify({ ...location, similarity: similarity.toFixed(4) })]
+        [userId, user.roll_number, user.section, 'Failed_Face', JSON.stringify({ ...location, similarity: similarity.toFixed(4) })]
       );
-      return res.status(403).json({ message: 'Match Failed: Face does not match your registered identity. Ensure good lighting.', similarity });
+      return res.status(403).json({ message: 'Match Failed', details: 'The face captured does not match your registered profile. Please ensure your face is clearly visible and well-lit.', similarity });
     }
 
     console.log(`[DEBUG] Verification Successful! Recording attendance...`);
