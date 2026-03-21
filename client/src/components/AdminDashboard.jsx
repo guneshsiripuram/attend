@@ -366,7 +366,7 @@ const AdminDashboard = () => {
           {(activeTab === 'attendance' || activeTab === 'roster') && (
              <div className="bg-white px-8 pb-4">
                 <div className="max-w-6xl mx-auto bg-slate-50/50 rounded-2xl p-5 border border-slate-100">
-                   <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                            <Clock className="w-4 h-4 text-primary-500" />
@@ -433,7 +433,8 @@ const AdminDashboard = () => {
                 <table className="w-full text-left table-fixed">
                    <thead>
                      <tr>
-                       <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[35%]">Student Details</th>
+                       <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[5%]">S.No</th>
+                       <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[30%]">Student Details</th>
                        <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[15%]">Roll/Sec</th>
                        <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[20%]">{activeTab === 'roster' ? 'Last Attempt' : 'Timestamp'}</th>
                        <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[15%] text-center">Live Status</th>
@@ -509,7 +510,8 @@ const AdminDashboard = () => {
                 <table className="w-full text-left table-fixed">
                    <thead>
                      <tr>
-                       <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[35%]">Student</th>
+                       <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[5%]">S.No</th>
+                       <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[30%]">Student</th>
                        <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[15%]">Roll/Sec</th>
                        <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[15%]">Face Data</th>
                        <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[20%]">Email</th>
@@ -544,7 +546,7 @@ const AdminDashboard = () => {
                       <td colSpan="5" className="py-20 text-center text-slate-400 italic font-medium">No students found matching this criteria.</td>
                     </tr>
                   ) : (
-                    rosterData.map((row) => {
+                    rosterData.map((row, index) => {
                       let statusStyle = 'bg-slate-100 text-slate-500 border-slate-200';
                       let statusText = 'Absent / Pending';
                       
@@ -558,7 +560,8 @@ const AdminDashboard = () => {
 
                       return (
                       <tr key={row.id} className={`hover:bg-slate-50/50 transition-colors group ${row.status === 'Present' ? '' : 'bg-red-50/10'}`}>
-                        <td className="py-4 px-6 w-[35%] overflow-hidden">
+                        <td className="py-4 px-4 w-[5%] text-xs font-bold text-slate-400 text-center">{index + 1}</td>
+                        <td className="py-4 px-6 w-[30%] overflow-hidden">
                           <div className="flex items-center gap-3">
                             <div className={`w-8 h-8 flex-shrink-0 rounded-lg flex items-center justify-center font-black text-xs ${row.status === 'Present' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
                               {row.full_name.charAt(0)}
@@ -627,9 +630,10 @@ const AdminDashboard = () => {
                       <td colSpan="5" className="py-20 text-center text-slate-400 italic font-medium">No records found for this criteria.</td>
                     </tr>
                   ) : (
-                    data.map((row) => (
+                    data.map((row, index) => (
                       <tr key={row.id} className="hover:bg-slate-50/50 transition-colors group">
-                        <td className="py-4 px-6 w-[35%] overflow-hidden">
+                        <td className="py-4 px-4 w-[5%] text-xs font-bold text-slate-400 text-center">{index + 1}</td>
+                        <td className="py-4 px-6 w-[30%] overflow-hidden">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 flex-shrink-0 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center font-black text-xs">
                               {row.full_name.charAt(0)}
@@ -698,9 +702,10 @@ const AdminDashboard = () => {
                       <td colSpan="5" className="py-20 text-center text-slate-400 italic font-medium">No students found.</td>
                     </tr>
                   ) : (
-                    students.map((student) => (
+                    students.map((student, index) => (
                       <tr key={student.id} className="hover:bg-slate-50/50 transition-colors group">
-                        <td className="py-4 px-6 w-[35%] overflow-hidden">
+                        <td className="py-4 px-4 w-[5%] text-xs font-bold text-slate-400 text-center">{index + 1}</td>
+                        <td className="py-4 px-6 w-[30%] overflow-hidden">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 flex-shrink-0 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center font-black text-xs">
                               {student.full_name.charAt(0)}
