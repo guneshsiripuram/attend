@@ -23,7 +23,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 
 // Verify Attendance
 router.post('/verify', authMiddleware, async (req, res) => {
-  const { face_descriptor, location, rollNumber, section } = req.body; 
+  const { face_descriptor, location } = req.body; 
   const userId = req.user.id;
 
   try {
@@ -59,25 +59,14 @@ router.post('/verify', authMiddleware, async (req, res) => {
     // ---------------------------
 
     // 1. Fetch user data (including roll_number, section and embedding)
-    const userResult = await query('SELECT roll_number, section, face_embedding FROM users WHERE id = $1', [userId]);
+    const userResult = await query('SELECT full_name, roll_number, section, face_embedding FROM users WHERE id = $1', [userId]);
     const user = userResult.rows[0];
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // 2. Roll Number & Section Check
-    console.log(`[DEBUG] Comparing Identity:`);
-    console.log(`[DEBUG] Input: Roll=${rollNumber}, Section=${section}`);
-    console.log(`[DEBUG] Database: Roll=${user.roll_number}, Section=${user.section}`);
-
-    if (rollNumber !== user.roll_number || section !== user.section) {
-      await query(
-        'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',
-        [userId, rollNumber, section, 'Failed_Roll', JSON.stringify(location)]
-      );
-      return res.status(403).json({ message: 'Identity verification failed. Please check your Roll Number and Section.' });
-    }
+    // --- Identity Check Removed (Using Database Ground Truth) ---
 
     // 3. Location Check
     const campusLat = parseFloat(process.env.CAMPUS_LAT);
@@ -94,7 +83,7 @@ router.post('/verify', authMiddleware, async (req, res) => {
     if (!isInside) {
       await query(
         'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',
-        [userId, rollNumber, section, 'Location_Denied', JSON.stringify({ ...location, distance, maxDistance: MAX_DISTANCE })]
+        [userId, user.roll_number, user.section, 'Location_Denied', JSON.stringify({ ...location, distance, maxDistance: MAX_DISTANCE })]
       );
       return res.status(403).json({ 
         message: 'Location verification failed. You must be on campus.',
@@ -148,7 +137,7 @@ router.post('/verify', authMiddleware, async (req, res) => {
       console.log(`[DEBUG] Match failed: ${similarity} < ${threshold}`);
       await query(
         'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',
-        [userId, rollNumber, section, 'Failed_Match', JSON.stringify({ ...location, similarity: similarity.toFixed(4) })]
+        [userId, user.roll_number, user.section, 'Failed_Match', JSON.stringify({ ...location, similarity: similarity.toFixed(4) })]
       );
       return res.status(403).json({ message: 'Facial recognition failed. Face does not match registered profile.', similarity });
     }
@@ -157,10 +146,17 @@ router.post('/verify', authMiddleware, async (req, res) => {
     // 6. Success
     await query(
       'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',
-      [userId, rollNumber, section, 'Present', JSON.stringify(location)]
+      [userId, user.roll_number, user.section, 'Present', JSON.stringify(location)]
     );
 
-    res.json({ message: 'Attendance marked successfully!', confidence: similarity });
+    res.json({ 
+      message: 'Attendance marked successfully!', 
+      confidence: similarity,
+      student: {
+        name: user.full_name,
+        rollNumber: user.roll_number
+      }
+    });
   } catch (error) {
     console.error('[ATTENDANCE_ERROR]:', error);
     res.status(500).json({ message: 'Server error during verification', details: error.message });

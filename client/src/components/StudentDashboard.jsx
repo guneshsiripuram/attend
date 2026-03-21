@@ -15,9 +15,6 @@ const StudentDashboard = ({ user }) => {
   const [result, setResult] = useState(null);
   const [history, setHistory] = useState([]);
   const [stats, setStats] = useState({ percentage: 0, present: 0, total: 0 });
-  const [rollNumber, setRollNumber] = useState('');
-  const [branch, setBranch] = useState('');
-  const [section, setSection] = useState('');
   const [currLocation, setCurrLocation] = useState(null);
   const [cameraError, setCameraError] = useState('');
   const [isCameraReady, setIsCameraReady] = useState(false);
@@ -87,11 +84,7 @@ const StudentDashboard = ({ user }) => {
     const imageToVerify = manualImage || webcamRef.current.getScreenshot();
     if (!imageToVerify) return;
 
-    if (!rollNumber || !section || !branch) {
-      setResult({ success: false, message: 'Please enter Roll Number, Branch and Section' });
-      return;
-    }
-
+    
     setIsVerifying(true);
     
     const performVerify = async (lat, lng) => {
@@ -109,12 +102,13 @@ const StudentDashboard = ({ user }) => {
         const resp = await axios.post('/attendance/verify', {
           face_descriptor: descriptor,
           isAuto: true,
-          rollNumber,
-          section,
-          branch,
           location: { lat, lng }
         });
-        setResult({ success: true, message: resp.data.message });
+        setResult({ 
+          success: true, 
+          message: resp.data.message,
+          student: resp.data.student 
+        });
         fetchHistory();
         setIsAutoMode(false); 
       } catch (err) {
@@ -152,13 +146,13 @@ const StudentDashboard = ({ user }) => {
 
   // Adaptive Auto-Verify Loop
   React.useEffect(() => {
-    if (isAutoMode && rollNumber && section && branch && !result?.success && !isVerifying && session.is_open) {
+    if (isAutoMode && !result?.success && !isVerifying && session.is_open) {
       autoVerifyTimeout.current = setTimeout(() => {
         handleVerify();
       }, 1500);
     }
     return () => clearTimeout(autoVerifyTimeout.current);
-  }, [isAutoMode, rollNumber, section, branch, result, isVerifying, session.is_open]);
+  }, [isAutoMode, result, isVerifying, session.is_open]);
 
   const chartData = [
     { name: 'Present', value: stats.present },
@@ -259,7 +253,7 @@ const StudentDashboard = ({ user }) => {
                      </p>
                      <p className="text-slate-400 text-xs font-medium italic">Wait for faculty to open the gate</p>
                   </div>
-                ) : isAutoMode && rollNumber && section && branch && !result?.success ? (
+                ) : isAutoMode && !result?.success ? (
                   <p className="text-primary-600 font-bold animate-pulse flex items-center justify-center gap-2 uppercase tracking-wider">
                     <Loader2 className="w-5 h-5 animate-spin" />
                     Auto-Scanning for your face...
@@ -285,7 +279,7 @@ const StudentDashboard = ({ user }) => {
                       </div>
                     )}
                     <p className="text-slate-500 text-sm">
-                      {result?.success ? 'Attendance verified successfully' : 'Enter your details to start scanning'}
+                      {result?.success ? `Verified: ${result.student?.name}` : 'Scanning for your identity...'}
                     </p>
                   </div>
                 )}
@@ -353,45 +347,17 @@ const StudentDashboard = ({ user }) => {
             </div>
    
             <div className="w-full max-w-lg flex flex-col gap-4">
-              <div className="grid grid-cols-3 gap-4 w-full">
-                <input
-                  type="text"
-                  placeholder="Roll Number"
-                  className="w-full px-4 py-4 border-2 border-slate-100 rounded-2xl focus:border-primary-500 outline-none text-center font-bold text-lg tracking-widest uppercase col-span-1"
-                  value={rollNumber}
-                  onChange={(e) => setRollNumber(e.target.value.toUpperCase())}
-                />
-                <select
-                  className="w-full px-4 py-4 border-2 border-slate-100 rounded-2xl focus:border-primary-500 outline-none text-center font-bold text-lg bg-white appearance-none"
-                  value={branch}
-                  onChange={(e) => setBranch(e.target.value)}
-                >
-                  <option value="" disabled>Branch</option>
-                   {BRANCHES.map(b => (
-                     <option key={b} value={b}>{b}</option>
-                   ))}
- 
-                </select>
-                <select
-                  className="w-full px-4 py-4 border-2 border-slate-100 rounded-2xl focus:border-primary-500 outline-none text-center font-bold text-lg bg-white appearance-none"
-                  value={section}
-                  onChange={(e) => setSection(e.target.value)}
-                >
-                  <option value="" disabled>Sec</option>
-                   {SECTIONS.map(s => (
-                     <option key={s} value={s}>{s}</option>
-                   ))}
- 
-                </select>
-              </div>
+              {/* Inputs Removed - Automated Identity */}
    
               {result && (
                 <div className={`p-4 rounded-2xl flex items-center gap-4 animate-fade-in ${
                   result.success ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-red-50 border border-red-200 text-red-700'
                 }`}>
                   {result.success ? <CheckCircle className="w-6 h-6" /> : <XCircle className="w-6 h-6" />}
-                  <div className="flex-1">
-                    <p className="font-medium">{result.message}</p>
+                  <div className="flex-1 text-center">
+                    <p className="font-black text-lg">Verified successfully!</p>
+                    <p className="font-medium text-sm text-green-600">Welcome, {result.student?.name}</p>
+                    <p className="text-[10px] font-bold opacity-70 uppercase tracking-widest">{result.student?.rollNumber}</p>
                     {result.message.includes('enrollment required') && (
                       <button 
                         onClick={() => navigate('/register', { state: { googleUser: user } })}
@@ -406,9 +372,9 @@ const StudentDashboard = ({ user }) => {
    
               <button
                 onClick={() => handleVerify()}
-                disabled={isVerifying || !rollNumber || !section || !branch || result?.success || !session.is_open}
+                disabled={isVerifying || result?.success || !session.is_open}
                 className={`w-full py-4 rounded-2xl font-bold shadow-xl flex items-center justify-center gap-3 transition-all ${
-                  isVerifying || !rollNumber || !section || !branch || result?.success || !session.is_open
+                  isVerifying || result?.success || !session.is_open
                   ? 'bg-slate-200 text-slate-400 cursor-not-allowed' 
                   : 'bg-primary-600 hover:bg-primary-700 text-white shadow-primary-200 active:scale-95'
                 }`}
