@@ -240,38 +240,52 @@ router.get('/attendance/history', authMiddleware, adminMiddleware, async (req, r
 // Session Gate Controls (GET allowed for all auth users, POST for admins only)
 router.get('/session', authMiddleware, async (req, res) => {
   try {
-    const result = await query('SELECT is_open, expires_at FROM portal_settings WHERE id = 1');
+    const result = await query('SELECT is_open, session_starts_at as starts_at, expires_at FROM portal_settings WHERE id = 1');
     let session = result.rows[0];
 
     // Auto-expiration check in GET route to prevent desync
     if (session && session.is_open && session.expires_at && new Date() > new Date(session.expires_at)) {
-      await query('UPDATE portal_settings SET is_open = false, expires_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = 1');
-      session = { ...session, is_open: false, expires_at: null };
+      await query('UPDATE portal_settings SET is_open = false, session_starts_at = NULL, expires_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = 1');
+      session = { ...session, is_open: false, starts_at: null, expires_at: null };
       console.log('--- SESSION AUTO-CLOSED (EXPIRED) ---');
     }
 
-    res.json(session);
+    // Attach current server time to help frontend calculate relative countdowns/status
+    res.json({
+        ...session,
+        server_time: new Date()
+    });
   } catch (err) {
     console.error('Session fetch error:', err);
     res.status(500).json({ message: 'Failed to fetch session' });
   }
 });
 
-// Toggle Session (Open/Close)
+// Toggle Session (Open/Close / Schedule)
 router.post('/session/toggle', authMiddleware, adminMiddleware, async (req, res) => {
-  const { isOpen, durationMinutes } = req.body;
+  const { isOpen, durationMinutes, startTime, endTime } = req.body;
   try {
+    let startsAt = null;
     let expiresAt = null;
-    if (isOpen && durationMinutes) {
-      expiresAt = new Date(Date.now() + durationMinutes * 60000);
+    
+    if (isOpen) {
+      if (startTime && endTime) {
+        // Scheduled future session
+        startsAt = new Date(startTime);
+        expiresAt = new Date(endTime);
+      } else if (durationMinutes) {
+        // Instant opening
+        startsAt = new Date();
+        expiresAt = new Date(Date.now() + durationMinutes * 60000);
+      }
     }
     
     await query(
-      "UPDATE portal_settings SET is_open = $1, expires_at = $2, updated_at = CURRENT_TIMESTAMP WHERE id = 1",
-      [isOpen, expiresAt]
+      "UPDATE portal_settings SET is_open = $1, session_starts_at = $2, expires_at = $3, updated_at = CURRENT_TIMESTAMP WHERE id = 1",
+      [isOpen, startsAt, expiresAt]
     );
     
-    res.json({ message: `Attendance gate ${isOpen ? 'OPEN' : 'CLOSED'}`, expiresAt });
+    res.json({ message: `Attendance gate ${isOpen ? (startTime ? 'SCHEDULED' : 'OPEN') : 'CLOSED'}`, startsAt, expiresAt });
   } catch (error) {
     console.error('--- SESSION_TOGGLE_ERROR ---');
     console.error('Error details:', error.message);

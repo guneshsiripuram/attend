@@ -167,6 +167,8 @@ const StudentDashboard = ({ user }) => {
   ];
   const COLORS = ['#0ea5e9', '#e2e8f0'];
 
+  const isScheduled = !session.is_open && session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date());
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
       {/* Left Column: Stats & History */}
@@ -250,20 +252,20 @@ const StudentDashboard = ({ user }) => {
        <div className="lg:col-span-2 space-y-6">
          {/* Session Status Banner */}
          <div className={`p-4 rounded-2xl border-2 flex items-center justify-between transition-all duration-500 shadow-sm ${
-           session.is_open ? 'bg-green-50 border-green-100' : 'bg-amber-50 border-amber-100'
+           session.is_open ? 'bg-green-50 border-green-100' : (isScheduled ? 'bg-amber-50 border-amber-100' : 'bg-red-50 border-red-100')
          }`}>
            <div className="flex items-center gap-4">
-             <div className={`p-2.5 rounded-xl flex items-center justify-center ${session.is_open ? 'bg-green-500 shadow-lg shadow-green-200' : 'bg-amber-500 shadow-lg shadow-amber-200'}`}>
-               {session.is_open ? <Shield className="w-5 h-5 text-white" /> : <Lock className="w-5 h-5 text-white" />}
+             <div className={`p-2.5 rounded-xl flex items-center justify-center shadow-lg ${session.is_open ? 'bg-green-500 shadow-green-200' : (isScheduled ? 'bg-amber-500 shadow-amber-200' : 'bg-red-500 shadow-red-200')}`}>
+               {session.is_open ? <Shield className="w-5 h-5 text-white" /> : (isScheduled ? <Clock className="w-5 h-5 text-white" /> : <Lock className="w-5 h-5 text-white" />)}
              </div>
              <div>
-                <p className={`text-sm font-black uppercase tracking-widest ${session.is_open ? 'text-green-700' : 'text-amber-700'}`}>
-                  Portal is {session.is_open ? 'OPEN' : 'CLOSED'}
+                <p className={`text-sm font-black uppercase tracking-widest ${session.is_open ? 'text-green-700' : (isScheduled ? 'text-amber-700' : 'text-red-700')}`}>
+                  {session.is_open ? 'Portal is OPEN' : (isScheduled ? 'Portal is SCHEDULED' : 'Portal is CLOSED')}
                 </p>
                 <p className="text-xs font-medium text-slate-500">
                   {session.is_open 
                     ? (session.expires_at ? `Automatically closing at ${new Date(session.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Closing soon by faculty') 
-                    : 'Wait for faculty to open the attendance gate'}
+                    : (isScheduled ? `Attendance opens exactly at ${new Date(session.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Wait for faculty to open the attendance gate')}
                 </p>
              </div>
            </div>
@@ -291,12 +293,14 @@ const StudentDashboard = ({ user }) => {
             {!session.is_open && (
               <div className="absolute inset-0 z-40 bg-slate-900/5 backdrop-blur-[1px] flex items-center justify-center p-8 transition-opacity duration-500">
                  <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 max-w-sm text-center space-y-4 transform translate-y-[-20px]">
-                    <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto">
-                       <Lock className="w-8 h-8 text-amber-500" />
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto ${isScheduled ? 'bg-amber-50' : 'bg-red-50'}`}>
+                       {isScheduled ? <Clock className="w-8 h-8 text-amber-500 animate-pulse" /> : <Lock className="w-8 h-8 text-red-500" />}
                     </div>
-                    <h3 className="text-xl font-bold text-slate-900">Attendance Gate Locked</h3>
+                    <h3 className="text-xl font-bold text-slate-900">
+                      {isScheduled ? 'Scheduled Attendance' : 'Attendance Gate Locked'}
+                    </h3>
                     <p className="text-sm text-slate-500 leading-relaxed">
-                      Faculty hasn't opened the attendance portal yet. Please wait until the session begins.
+                      {isScheduled ? (<>The portal is scheduled to open at <strong className="text-amber-600">{new Date(session.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>. Please get your face ready.</>) : "Faculty hasn't opened the attendance portal yet. Please wait until the session begins."}
                     </p>
                  </div>
               </div>
@@ -351,18 +355,33 @@ const StudentDashboard = ({ user }) => {
               {/* Gate Closed Overlay */}
               {!isSessionLoading && !session.is_open && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md z-30 transition-all duration-500">
-                   <div className="w-20 h-20 bg-slate-900 rounded-3xl flex items-center justify-center mb-6 shadow-2xl border border-white/5 animate-bounce-subtle">
-                      <ShieldCheck className="w-10 h-10 text-slate-500" />
-                   </div>
-                   <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-2">Portal is CLOSED</h3>
-                   <p className="text-slate-400 text-xs font-bold text-center px-8 leading-relaxed">
-                      This is not the time to take attendance.<br/>
-                      Please check with your faculty for the schedule.
-                   </p>
-                   <div className="mt-8 px-4 py-2 bg-white/5 rounded-full border border-white/10 flex items-center gap-2">
-                      <Clock className="w-3 h-3 text-slate-500" />
-                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">Access Locked</span>
-                   </div>
+                   {isScheduled ? (
+                     <div className="flex flex-col items-center justify-center">
+                       <div className="w-20 h-20 bg-slate-900 rounded-3xl flex items-center justify-center mb-6 shadow-2xl border border-amber-500/20 animate-pulse">
+                          <Clock className="w-10 h-10 text-amber-500" />
+                       </div>
+                       <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-2">Upcoming Schedule</h3>
+                       <p className="text-slate-400 text-xs font-bold text-center px-8 leading-relaxed">
+                          Attendance is scheduled to begin at<br/>
+                          <span className="text-amber-500">{new Date(session.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>. Please be ready.
+                       </p>
+                     </div>
+                   ) : (
+                     <div className="flex flex-col items-center justify-center">
+                       <div className="w-20 h-20 bg-slate-900 rounded-3xl flex items-center justify-center mb-6 shadow-2xl border border-white/5 animate-bounce-subtle">
+                          <ShieldCheck className="w-10 h-10 text-slate-500" />
+                       </div>
+                       <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-2">Portal is CLOSED</h3>
+                       <p className="text-slate-400 text-xs font-bold text-center px-8 leading-relaxed">
+                          This is not the time to take attendance.<br/>
+                          Please check with your faculty for the schedule.
+                       </p>
+                       <div className="mt-8 px-4 py-2 bg-white/5 rounded-full border border-white/10 flex items-center gap-2">
+                          <Lock className="w-3 h-3 text-slate-500" />
+                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">Access Locked</span>
+                       </div>
+                     </div>
+                   )}
                 </div>
               )}
 

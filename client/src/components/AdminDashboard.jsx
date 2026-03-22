@@ -41,8 +41,10 @@ const AdminDashboard = () => {
   });
   
   // Session Gate States
-  const [session, setSession] = useState({ is_open: false, expires_at: null });
+  const [session, setSession] = useState({ is_open: false, starts_at: null, expires_at: null, server_time: null });
   const [sessionLoading, setSessionLoading] = useState(false);
+  const [scheduleStart, setScheduleStart] = useState('');
+  const [scheduleEnd, setScheduleEnd] = useState('');
 
   const fetchSession = async () => {
     try {
@@ -110,14 +112,25 @@ const AdminDashboard = () => {
   }, [activeTab, filters.date, filters.branch, filters.section]);
 
   // Handle Session Toggle
-  const handleToggleSession = async (minutes) => {
+  const handleToggleSession = async (minutes, startTime = null, endTime = null) => {
     setSessionLoading(true);
     try {
       const resp = await axios.post('/admin/session/toggle', {
         isOpen: !session.is_open,
-        durationMinutes: !session.is_open ? minutes : null
+        durationMinutes: !session.is_open && minutes ? minutes : null,
+        startTime: !session.is_open && startTime ? new Date(startTime).toISOString() : null,
+        endTime: !session.is_open && endTime ? new Date(endTime).toISOString() : null
       });
-      setSession({ is_open: !session.is_open, expires_at: resp.data.expiresAt });
+      setSession({ 
+        is_open: !session.is_open, 
+        starts_at: resp.data.startsAt, 
+        expires_at: resp.data.expiresAt, 
+        server_time: new Date() 
+      });
+      if (startTime) {
+        setScheduleStart('');
+        setScheduleEnd('');
+      }
     } catch (err) {
       alert('Failed to update session');
     } finally {
@@ -785,46 +798,50 @@ const AdminDashboard = () => {
                    <div className="pt-6 space-y-4">
                       {session.is_open ? (
                         <div className="space-y-6">
-                           <div className="p-6 bg-green-50 border-2 border-green-100 rounded-3xl flex items-center justify-between animate-pulse">
+                           <div className={`p-6 border-2 rounded-3xl flex items-center justify-between ${session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? 'bg-amber-50 border-amber-100' : 'bg-green-50 border-green-100 animate-pulse'}`}>
                               <div className="flex items-center gap-4">
-                                 <div className="w-12 h-12 bg-green-500 rounded-2xl flex items-center justify-center shadow-lg shadow-green-200">
+                                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg ${session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? 'bg-amber-500 shadow-amber-200' : 'bg-green-500 shadow-green-200'}`}>
                                     <Clock className="w-6 h-6 text-white" />
                                  </div>
                                  <div>
-                                    <p className="text-green-800 font-black text-lg">GATE IS OPEN</p>
-                                    <p className="text-green-600 text-sm font-bold">Students can now mark attendance</p>
+                                    <p className={`font-black text-lg ${session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? 'text-amber-800' : 'text-green-800'}`}>
+                                      {session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? 'GATE SCHEDULED' : 'GATE IS OPEN'}
+                                    </p>
+                                    <p className={`text-sm font-bold ${session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? 'text-amber-600' : 'text-green-600'}`}>
+                                      {session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? `Opens at ${new Date(session.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Students can now mark attendance'}
+                                    </p>
                                  </div>
                               </div>
                               {session.expires_at && (
                                 <div className="text-right">
-                                   <p className="text-xs font-bold text-green-700 uppercase">Closes at</p>
-                                   <p className="text-xl font-black text-green-800">{new Date(session.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                   <p className={`text-xs font-bold uppercase ${session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? 'text-amber-700' : 'text-green-700'}`}>Closes at</p>
+                                   <p className={`text-xl font-black ${session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? 'text-amber-800' : 'text-green-800'}`}>{new Date(session.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                                 </div>
                               )}
                            </div>
                            <button 
                              onClick={() => handleToggleSession(null)}
                              disabled={sessionLoading}
-                             className="w-full py-5 bg-red-500 text-white font-black rounded-3xl shadow-xl shadow-red-100 hover:bg-red-600 transition-all transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3"
+                             className={`w-full py-5 text-white font-black rounded-3xl shadow-xl transition-all transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3 ${session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? 'bg-slate-800 hover:bg-slate-900 shadow-slate-200' : 'bg-red-500 hover:bg-red-600 shadow-red-100'}`}
                            >
                              <LogOut className="w-6 h-6 rotate-180" />
-                             FORCE CLOSE GATE NOW
+                             {session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? 'CANCEL SCHEDULE' : 'FORCE CLOSE GATE NOW'}
                            </button>
                         </div>
                       ) : (
-                        <div className="space-y-8">
+                        <div className="space-y-6">
                            <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl flex items-center gap-4">
                               <div className="w-12 h-12 bg-slate-200 rounded-2xl flex items-center justify-center">
                                  <Shield className="w-6 h-6 text-slate-500" />
                               </div>
                               <div>
                                  <p className="text-slate-800 font-black text-lg uppercase tracking-tight">Gate is Closed</p>
-                                 <p className="text-slate-400 text-sm font-medium">Select a duration to start the session</p>
+                                 <p className="text-slate-400 text-sm font-medium">Select a duration or schedule a time</p>
                               </div>
                            </div>
                            
                            <div className="grid grid-cols-3 gap-4">
-                              {[5, 10, 15].map(mins => (
+                              {[10, 20, 30].map(mins => (
                                 <button
                                   key={mins}
                                   onClick={() => handleToggleSession(mins)}
@@ -837,6 +854,26 @@ const AdminDashboard = () => {
                                    <span className="font-black text-slate-400 group-hover:text-primary-700">{mins} MINS</span>
                                 </button>
                               ))}
+                           </div>
+
+                           <div className="p-5 bg-white border border-slate-200 rounded-[2rem] shadow-sm mt-2">
+                             <p className="text-slate-800 font-bold mb-4 flex items-center gap-2 text-sm">
+                               <Clock className="w-4 h-4 text-primary-500" />
+                               Schedule Custom Window
+                             </p>
+                             <div className="flex flex-col md:flex-row gap-4 items-end">
+                               <div className="flex-1">
+                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Start Time</label>
+                                 <input type="datetime-local" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all text-sm" value={scheduleStart} onChange={(e) => setScheduleStart(e.target.value)} />
+                               </div>
+                               <div className="flex-1">
+                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">End Time</label>
+                                 <input type="datetime-local" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all text-sm" value={scheduleEnd} onChange={(e) => setScheduleEnd(e.target.value)} />
+                               </div>
+                               <button onClick={() => handleToggleSession(null, scheduleStart, scheduleEnd)} disabled={sessionLoading || (!scheduleStart || !scheduleEnd)} className="px-6 py-3 bg-slate-900 text-white font-bold rounded-xl shadow-lg shadow-slate-200 hover:bg-slate-800 disabled:opacity-50 transition-all text-sm h-[46px] whitespace-nowrap">
+                                 Schedule
+                               </button>
+                             </div>
                            </div>
                         </div>
                       )}

@@ -30,16 +30,22 @@ router.post('/verify', authMiddleware, async (req, res) => {
 
   try {
     // 0. Session Gatekeeper Check
-    const sessionResult = await query("SELECT is_open, expires_at FROM portal_settings WHERE id = 1");
+    const sessionResult = await query("SELECT is_open, session_starts_at, expires_at FROM portal_settings WHERE id = 1");
     const session = sessionResult.rows[0];
     
     if (!session || !session.is_open) {
       return res.status(403).json({ message: 'Portal Closed: Faculty has not opened attendance for this session.' });
     }
     
-    if (session.expires_at && new Date() > new Date(session.expires_at)) {
+    const now = new Date();
+    
+    if (session.session_starts_at && now < new Date(session.session_starts_at)) {
+      return res.status(403).json({ message: 'Portal Scheduled: The attendance window has not started yet.' });
+    }
+    
+    if (session.expires_at && now > new Date(session.expires_at)) {
       // Auto-close if expired
-      await query("UPDATE portal_settings SET is_open = FALSE WHERE id = 1");
+      await query("UPDATE portal_settings SET is_open = FALSE, session_starts_at = NULL, expires_at = NULL WHERE id = 1");
       return res.status(403).json({ message: 'Session Expired: The attendance window has closed automatically.' });
     }
 
@@ -211,17 +217,20 @@ router.get('/me', authMiddleware, async (req, res) => {
 // Get Portal Session Status (Student endpoint)
 router.get('/session', authMiddleware, async (req, res) => {
   try {
-    const result = await query('SELECT is_open, expires_at FROM portal_settings WHERE id = 1');
+    const result = await query('SELECT is_open, session_starts_at as starts_at, expires_at FROM portal_settings WHERE id = 1');
     let session = result.rows[0];
 
     // Auto-expiration check
     if (session && session.is_open && session.expires_at && new Date() > new Date(session.expires_at)) {
-      await query('UPDATE portal_settings SET is_open = false, expires_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = 1');
-      session = { ...session, is_open: false, expires_at: null };
+      await query('UPDATE portal_settings SET is_open = false, session_starts_at = NULL, expires_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = 1');
+      session = { ...session, is_open: false, starts_at: null, expires_at: null };
       console.log('--- STUDENT SESSION AUTO-CLOSED (EXPIRED) ---');
     }
 
-    res.json(session);
+    res.json({
+      ...session,
+      server_time: new Date()
+    });
   } catch (err) {
     console.error('Session fetch error:', err);
     res.status(500).json({ message: 'Failed to fetch session' });
