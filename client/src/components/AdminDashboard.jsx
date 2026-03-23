@@ -651,8 +651,8 @@ const AdminDashboard = () => {
                           <div className="text-[10px]">
                             {row.timestamp ? (
                               <>
-                                <p className="font-bold text-slate-700">{new Date(row.timestamp).toLocaleDateString()}</p>
-                                <p className="text-slate-400">{new Date(row.timestamp).toLocaleTimeString()}</p>
+                                <p className="font-bold text-slate-700">{new Date(row.timestamp).toLocaleDateString('en-IN')}</p>
+                                <p className="text-slate-400">{new Date(row.timestamp).toLocaleTimeString('en-IN')}</p>
                               </>
                             ) : (
                               <p className="text-slate-400 italic">No attempts yet</p>
@@ -721,8 +721,8 @@ const AdminDashboard = () => {
                         </td>
                         <td className="py-4 px-6 w-[20%]">
                           <div className="text-[10px]">
-                            <p className="font-bold text-slate-700">{new Date(row.timestamp).toLocaleDateString()}</p>
-                            <p className="text-slate-400">{new Date(row.timestamp).toLocaleTimeString()}</p>
+                            <p className="font-bold text-slate-700">{new Date(row.timestamp).toLocaleDateString('en-IN')}</p>
+                            <p className="text-slate-400">{new Date(row.timestamp).toLocaleTimeString('en-IN')}</p>
                           </div>
                         </td>
                         <td className="py-4 px-6 w-[15%] text-center">
@@ -860,7 +860,7 @@ const AdminDashboard = () => {
                                       {session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? 'GATE SCHEDULED' : 'GATE IS OPEN'}
                                     </p>
                                     <p className={`text-sm font-bold ${session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? 'text-amber-600' : 'text-green-600'}`}>
-                                      {session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? `Opens at ${new Date(session.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Students can now mark attendance'}
+                                      {session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? `Opens at ${new Date(session.starts_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'Students can now mark attendance'}
                                     </p>
                                  </div>
                               </div>

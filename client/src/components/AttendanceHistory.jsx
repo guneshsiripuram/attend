@@ -47,7 +47,7 @@ const AttendanceHistory = () => {
       r.branch || 'Unknown',
       r.section || 'Unknown',
       r.college_email || r.email || '--',
-      r.timestamp ? new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--',
+      r.timestamp ? new Date(r.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '--',
       r.status
     ]);
 
@@ -229,7 +229,7 @@ const AttendanceHistory = () => {
                     </div>
                     <div className="text-left">
                       <h3 className="font-extrabold text-slate-900 text-lg">
-                        {new Date(day.date).toLocaleDateString('en-US', { 
+                        {new Date(day.date).toLocaleDateString('en-IN', { 
                           year: 'numeric', 
                           month: 'long', 
                           day: 'numeric' 
@@ -237,7 +237,7 @@ const AttendanceHistory = () => {
                       </h3>
                       {isExpanded && (
                         <p className="text-sm text-slate-400 font-medium">
-                          {new Date(day.date).toLocaleDateString('en-US', { weekday: 'long' })}
+                          {new Date(day.date).toLocaleDateString('en-IN', { weekday: 'long' })}
                         </p>
                       )}
                     </div>
@@ -333,7 +333,7 @@ const AttendanceHistory = () => {
                               </td>
                               <td className="px-8 py-5 whitespace-nowrap">
                                 <span className="text-sm text-slate-700 font-medium">
-                                  {record.timestamp ? new Date(record.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--'}
+                                  {record.timestamp ? new Date(record.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '--'}
                                 </span>
                               </td>
                               <td className="px-8 py-5 whitespace-nowrap">

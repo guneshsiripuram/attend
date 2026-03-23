@@ -229,12 +229,12 @@ const StudentDashboard = ({ user }) => {
                   <div key={log.id} className="p-3 rounded-xl bg-white border border-slate-100 flex items-center justify-between">
                     <div>
                       <p className="font-semibold text-sm">
-                        {new Date(log.timestamp).toLocaleDateString()} - 
-                        <span className="ml-1 text-primary-600">
+                        {new Date(log.timestamp).toLocaleDateString('en-IN')} - 
+                        <span className="ml-2 text-primary-600 text-[10px] uppercase font-black">
                           {new Date(new Date(log.timestamp).toLocaleString("en-US", {timeZone: "Asia/Kolkata"})).getHours() < 12 ? 'Morning' : 'Afternoon'}
                         </span>
                       </p>
-                      <p className="text-xs text-slate-500">{new Date(log.timestamp).toLocaleTimeString()}</p>
+                      <p className="text-[10px] font-bold text-slate-400 mt-0.5">{new Date(log.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
                     <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                       log.status === 'Present' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
@@ -265,8 +265,8 @@ const StudentDashboard = ({ user }) => {
                 </p>
                 <p className="text-xs font-medium text-slate-500">
                   {isTrulyOpen 
-                    ? (session.expires_at ? `Automatically closing at ${new Date(session.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Closing soon by faculty') 
-                    : (isScheduled ? `Attendance opens exactly at ${new Date(session.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Wait for faculty to open the attendance gate')}
+                    ? (session.expires_at ? `Automatically closing at ${new Date(session.expires_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'Closing soon by faculty') 
+                    : (isScheduled ? `Attendance opens exactly at ${new Date(session.starts_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'Wait for faculty to open the attendance gate')}
                 </p>
              </div>
            </div>
@@ -301,7 +301,7 @@ const StudentDashboard = ({ user }) => {
                       {isScheduled ? 'Scheduled Attendance' : 'Attendance Gate Locked'}
                     </h3>
                     <p className="text-sm text-slate-500 leading-relaxed">
-                      {isScheduled ? (<>The portal is scheduled to open at <strong className="text-amber-600">{new Date(session.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>. Please get your face ready.</>) : "Faculty hasn't opened the attendance portal yet. Please wait until the session begins."}
+                      {isScheduled ? (<>The portal is scheduled to open at <strong className="text-amber-600">{new Date(session.starts_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</strong>. Please get your face ready.</>) : "Faculty hasn't opened the attendance portal yet. Please wait until the session begins."}
                     </p>
                  </div>
               </div>
