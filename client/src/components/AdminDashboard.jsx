@@ -250,7 +250,13 @@ const AdminDashboard = () => {
     setMatrixLoading(true);
     try {
       const resp = await axios.get('/admin/attendance/matrix', { 
-        params: { branch: filters.branch, section: filters.section, startDate: matrixRange.start, endDate: matrixRange.end } 
+        params: { 
+          branch: filters.branch, 
+          section: filters.section, 
+          startDate: matrixRange.start, 
+          endDate: matrixRange.end,
+          rollNumber: filters.rollNumber
+        } 
       });
       setMatrixData(resp.data);
     } catch (err) {
@@ -258,7 +264,7 @@ const AdminDashboard = () => {
     } finally {
       setMatrixLoading(false);
     }
-  }, [filters.branch, filters.section, matrixRange]);
+  }, [filters.branch, filters.section, filters.rollNumber, matrixRange]);
 
   useEffect(() => {
     if (activeTab === 'matrix') fetchMatrix();
@@ -542,18 +548,16 @@ const AdminDashboard = () => {
                           <option value="D">Section D</option>
                         </select>
                       </div>
-                      {activeTab !== 'matrix' && (
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                          <input 
-                            type="text" 
-                            placeholder="Search Roll Number" 
-                            className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-xs w-full"
-                            value={filters.rollNumber}
-                            onChange={(e) => setFilters({...filters, rollNumber: e.target.value})}
-                          />
-                        </div>
-                      )}
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input 
+                          type="text" 
+                          placeholder="Search Roll Number" 
+                          className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-xs w-full"
+                          value={filters.rollNumber}
+                          onChange={(e) => setFilters({...filters, rollNumber: e.target.value})}
+                        />
+                      </div>
                    </div>
                 </div>
              </div>

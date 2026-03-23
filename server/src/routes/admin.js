@@ -298,7 +298,7 @@ router.post('/session/toggle', authMiddleware, adminMiddleware, async (req, res)
 
 // Get Attendance Matrix (Pivot Table for Excel-style view)
 router.get('/attendance/matrix', authMiddleware, adminMiddleware, async (req, res) => {
-  const { branch, section, startDate, endDate } = req.query;
+  const { branch, section, startDate, endDate, rollNumber } = req.query;
   
   try {
     // 1. Fetch Students
@@ -306,6 +306,10 @@ router.get('/attendance/matrix', authMiddleware, adminMiddleware, async (req, re
     const studentParams = [];
     if (branch) { studentParams.push(branch); studentQ += ` AND branch = $${studentParams.length}`; }
     if (section) { studentParams.push(section); studentQ += ` AND section = $${studentParams.length}`; }
+    if (rollNumber) { 
+      studentParams.push(`%${rollNumber}%`); 
+      studentQ += ` AND roll_number ILIKE $${studentParams.length}`; 
+    }
     studentQ += ` ORDER BY roll_number ASC`;
     const studentsResult = await query(studentQ, studentParams);
     const students = studentsResult.rows;
