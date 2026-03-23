@@ -296,4 +296,77 @@ router.post('/session/toggle', authMiddleware, adminMiddleware, async (req, res)
   }
 });
 
+// Get Attendance Matrix (Pivot Table for Excel-style view)
+router.get('/attendance/matrix', authMiddleware, adminMiddleware, async (req, res) => {
+  const { branch, section, startDate, endDate } = req.query;
+  
+  try {
+    // 1. Fetch Students
+    let studentQ = `SELECT id, full_name, roll_number, branch, section FROM users WHERE role = 'student'`;
+    const studentParams = [];
+    if (branch) { studentParams.push(branch); studentQ += ` AND branch = $${studentParams.length}`; }
+    if (section) { studentParams.push(section); studentQ += ` AND section = $${studentParams.length}`; }
+    studentQ += ` ORDER BY roll_number ASC`;
+    const studentsResult = await query(studentQ, studentParams);
+    const students = studentsResult.rows;
+
+    // 2. Fetch Logs in Range
+    let logsQ = `
+      SELECT 
+        user_id, 
+        (timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date as date,
+        EXTRACT(HOUR FROM timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata') as hour
+      FROM attendance_logs 
+      WHERE status = 'Present'
+    `;
+    const logsParams = [];
+    if (startDate) { logsParams.push(startDate); logsQ += ` AND (timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date >= $${logsParams.length}`; }
+    if (endDate) { logsParams.push(endDate); logsQ += ` AND (timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date <= $${logsParams.length}`; }
+    const logsResult = await query(logsQ, logsParams);
+
+    // 3. Process Matrix
+    const matrix = {};
+    const uniqueDates = new Set();
+
+    logsResult.rows.forEach(log => {
+      const dateStr = new Date(log.date).toISOString().split('T')[0];
+      uniqueDates.add(dateStr);
+      
+      if (!matrix[log.user_id]) matrix[log.user_id] = {};
+      if (!matrix[log.user_id][dateStr]) matrix[log.user_id][dateStr] = { morning: false, afternoon: false };
+      
+      if (log.hour < 12) matrix[log.user_id][dateStr].morning = true;
+      else matrix[log.user_id][dateStr].afternoon = true;
+    });
+
+    const sortedDates = Array.from(uniqueDates).sort();
+
+    // 4. Format for Frontend
+    const rows = students.map((s, idx) => {
+      const attendance = {};
+      sortedDates.forEach(d => {
+        const stat = matrix[s.id]?.[d];
+        if (!stat) attendance[d] = '-';
+        else if (stat.morning && stat.afternoon) attendance[d] = 'P';
+        else if (stat.morning) attendance[d] = 'M';
+        else if (stat.afternoon) attendance[d] = 'A';
+      });
+      return {
+        sn: idx + 1,
+        id: s.id,
+        name: s.full_name,
+        roll: s.roll_number,
+        branch: s.branch,
+        section: s.section,
+        attendance
+      };
+    });
+
+    res.json({ dates: sortedDates, rows });
+  } catch (error) {
+    console.error('[MATRIX_API_ERROR]:', error);
+    res.status(500).json({ message: 'Error generating attendance matrix' });
+  }
+});
+
 module.exports = router;
