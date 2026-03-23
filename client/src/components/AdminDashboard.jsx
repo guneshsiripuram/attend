@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Filter, Download, Users, CheckCircle, Clock, AlertCircle, Shield, LogOut, ChevronRight, UserPlus, Settings, Database, RotateCcw, Trash2, Fingerprint, X, History, Loader2, MapPin, UserCheck } from 'lucide-react';
+import { Search, Filter, Download, Users, CheckCircle, Clock, AlertCircle, Shield, LogOut, ChevronRight, UserPlus, Settings, Database, RotateCcw, Trash2, Fingerprint, X, History, Loader2, MapPin, UserCheck, LayoutDashboard } from 'lucide-react';
 import AttendanceHistory from './AttendanceHistory';
 import { BRANCHES, SECTIONS } from '../constants';
 
