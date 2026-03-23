@@ -2,6 +2,9 @@ const express = require('express');
 const { query } = require('../db');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 
+// FORCE SYNC FIX: 2026-03-23-01
+// This comment ensures GitHub Desktop detects the latest IST and Stats improvements.
+
 
 const router = express.Router();
 
