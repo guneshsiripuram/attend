@@ -167,7 +167,8 @@ const StudentDashboard = ({ user }) => {
   ];
   const COLORS = ['#0ea5e9', '#e2e8f0'];
 
-  const isScheduled = !session.is_open && session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date());
+  const isTrulyOpen = session.is_open && (!session.starts_at || new Date(session.starts_at) <= (session.server_time ? new Date(session.server_time) : new Date()));
+  const isScheduled = !isTrulyOpen && session.is_open && session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date());
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
@@ -252,24 +253,24 @@ const StudentDashboard = ({ user }) => {
        <div className="lg:col-span-2 space-y-6">
          {/* Session Status Banner */}
          <div className={`p-4 rounded-2xl border-2 flex items-center justify-between transition-all duration-500 shadow-sm ${
-           session.is_open ? 'bg-green-50 border-green-100' : (isScheduled ? 'bg-amber-50 border-amber-100' : 'bg-red-50 border-red-100')
+           isTrulyOpen ? 'bg-green-50 border-green-100' : (isScheduled ? 'bg-amber-50 border-amber-100' : 'bg-red-50 border-red-100')
          }`}>
            <div className="flex items-center gap-4">
-             <div className={`p-2.5 rounded-xl flex items-center justify-center shadow-lg ${session.is_open ? 'bg-green-500 shadow-green-200' : (isScheduled ? 'bg-amber-500 shadow-amber-200' : 'bg-red-500 shadow-red-200')}`}>
-               {session.is_open ? <Shield className="w-5 h-5 text-white" /> : (isScheduled ? <Clock className="w-5 h-5 text-white" /> : <Lock className="w-5 h-5 text-white" />)}
+             <div className={`p-2.5 rounded-xl flex items-center justify-center shadow-lg ${isTrulyOpen ? 'bg-green-500 shadow-green-200' : (isScheduled ? 'bg-amber-500 shadow-amber-200' : 'bg-red-500 shadow-red-200')}`}>
+               {isTrulyOpen ? <Shield className="w-5 h-5 text-white" /> : (isScheduled ? <Clock className="w-5 h-5 text-white" /> : <Lock className="w-5 h-5 text-white" />)}
              </div>
              <div>
-                <p className={`text-sm font-black uppercase tracking-widest ${session.is_open ? 'text-green-700' : (isScheduled ? 'text-amber-700' : 'text-red-700')}`}>
-                  {session.is_open ? 'Portal is OPEN' : (isScheduled ? 'Portal is SCHEDULED' : 'Portal is CLOSED')}
+                <p className={`text-sm font-black uppercase tracking-widest ${isTrulyOpen ? 'text-green-700' : (isScheduled ? 'text-amber-700' : 'text-red-700')}`}>
+                  {isTrulyOpen ? 'Portal is OPEN' : (isScheduled ? 'Portal is SCHEDULED' : 'Portal is CLOSED')}
                 </p>
                 <p className="text-xs font-medium text-slate-500">
-                  {session.is_open 
+                  {isTrulyOpen 
                     ? (session.expires_at ? `Automatically closing at ${new Date(session.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Closing soon by faculty') 
                     : (isScheduled ? `Attendance opens exactly at ${new Date(session.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Wait for faculty to open the attendance gate')}
                 </p>
              </div>
            </div>
-           {session.is_open && (
+           {isTrulyOpen && (
              <div className="flex flex-col items-end gap-1">
                <div className="px-4 py-2 bg-white rounded-xl border border-green-200 flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-green-500 animate-ping"></div>

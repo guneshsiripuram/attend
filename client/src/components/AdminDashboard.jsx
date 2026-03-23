@@ -304,7 +304,45 @@ const AdminDashboard = () => {
                 </h1>
                 <p className="text-slate-500 text-sm">System management console & real-time analytics</p>
               </div>
-                <div className="flex gap-3">
+
+              <div className="flex flex-1 items-center justify-end gap-8 px-8">
+                  {((activeTab === 'attendance' || activeTab === 'roster') && session.is_open) && (
+                    <>
+                      <div className="text-right">
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Gate Status</p>
+                         {(() => {
+                            const isTrulyOpen = session.is_open && (!session.starts_at || new Date(session.starts_at) <= (session.server_time ? new Date(session.server_time) : new Date()));
+                            const isSch = !isTrulyOpen && session.is_open && session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date());
+                            return (
+                              <div className="flex items-center gap-2 justify-end">
+                                <div className={`w-2 h-2 rounded-full ${isTrulyOpen ? 'bg-green-500 animate-pulse' : (isSch ? 'bg-amber-500' : 'bg-red-500')}`}></div>
+                                <span className={`text-sm font-black uppercase tracking-widest ${isTrulyOpen ? 'text-green-600' : (isSch ? 'text-amber-500' : 'text-red-600')}`}>
+                                  {isTrulyOpen ? 'Live' : (isSch ? 'Scheduled' : 'Closed')}
+                                </span>
+                              </div>
+                            );
+                         })()}
+                      </div>
+                      <div className="w-px h-8 bg-slate-100"></div>
+                      <div className="text-right">
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Remaining</p>
+                         <p className="text-lg font-black text-slate-900 font-mono tracking-tighter">
+                            {session.expires_at 
+                              ? (() => {
+                                  const diff = new Date(session.expires_at) - (session.server_time ? new Date(session.server_time) : new Date());
+                                  if (diff <= 0) return '00:00';
+                                  const mins = Math.floor(diff / 60000);
+                                  const secs = Math.floor((diff % 60000) / 1000);
+                                  return `${mins}:${secs.toString().padStart(2, '0')}`;
+                                })()
+                              : '--:--'}
+                         </p>
+                      </div>
+                    </>
+                  )}
+              </div>
+
+              <div className="flex gap-3">
                   <button 
                     onClick={handleDownloadReport}
                     className="flex items-center gap-2 bg-white border border-slate-200 px-5 py-2.5 rounded-xl text-slate-600 hover:bg-slate-50 transition-all font-semibold shadow-sm text-sm"
