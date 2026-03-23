@@ -273,7 +273,10 @@ const AdminDashboard = () => {
       'Total Days', 'No. of Presentees'
     ];
     const rows = matrixData.rows.map(r => {
-      const attendanceValues = matrixData.dates.map(d => r.attendance[d] || '-');
+      const attendanceValues = matrixData.dates.map(d => {
+        const status = r.attendance[d] || '-';
+        return status === 'M' ? 'P' : status;
+      });
       const presentCount = attendanceValues.filter(v => v === 'P').length;
       
       return [
@@ -847,9 +850,9 @@ const AdminDashboard = () => {
                           <th className="px-6 py-4 text-center text-[10px] font-black text-green-600 uppercase tracking-widest whitespace-nowrap sticky right-0 bg-slate-50 z-10">Present</th>
                         </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
+                    <tbody className="divide-y divide-slate-100 bg-white">
                       {matrixData.rows.map((row, idx) => {
-                        const presentCount = matrixData.dates.filter(d => row.attendance[d] === 'P').length;
+                        const presentCount = matrixData.dates.filter(d => row.attendance[d] === 'P' || row.attendance[d] === 'M').length;
                         return (
                           <tr key={row.roll} className="hover:bg-slate-50/50 transition-colors">
                             <td className="px-6 py-4 whitespace-nowrap text-xs font-bold text-slate-400">{idx + 1}</td>
@@ -857,14 +860,15 @@ const AdminDashboard = () => {
                             <td className="px-6 py-4 whitespace-nowrap text-xs font-bold text-slate-700">{row.name}</td>
                             {matrixData.dates.map(date => {
                               const status = row.attendance[date];
+                              const displayStatus = status === 'M' ? 'P' : (status || '-');
                               return (
                                 <td key={date} className="px-4 py-4 whitespace-nowrap text-center">
                                   <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg text-[10px] font-black ${
-                                    status === 'P' ? 'bg-green-50 text-green-600' :
-                                    status === 'A' ? 'bg-red-50 text-red-500' :
+                                    displayStatus === 'P' ? 'bg-green-50 text-green-600' :
+                                    displayStatus === 'A' ? 'bg-red-50 text-red-500' :
                                     'bg-slate-50 text-slate-300'
                                   }`}>
-                                    {status || '-'}
+                                    {displayStatus}
                                   </span>
                                 </td>
                               );
