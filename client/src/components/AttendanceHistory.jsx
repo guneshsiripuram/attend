@@ -30,6 +30,45 @@ const AttendanceHistory = () => {
     }
   };
 
+  const handleDownloadDayCSV = (day) => {
+    const records = getDayRecords(day);
+    if (!records || records.length === 0) {
+      alert('No records to export');
+      return;
+    }
+
+    // Create CSV header
+    const headers = ['Name', 'Roll Number', 'Branch', 'Section', 'Email', 'Check-In Time', 'Status'];
+    
+    // Convert data to rows
+    const rows = records.map(r => [
+      r.full_name,
+      r.roll_number,
+      r.branch || 'Unknown',
+      r.section || 'Unknown',
+      r.college_email || r.email || '--',
+      r.timestamp ? new Date(r.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--',
+      r.status
+    ]);
+
+    // Combine headers and rows
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell || ''}"`).join(','))
+    ].join('\n');
+
+    // Create blob and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Attendance_Report_${day.date}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const toggleDate = (date) => {
     setExpandedDates(prev => ({
       ...prev,
@@ -219,6 +258,16 @@ const AttendanceHistory = () => {
                   </div>
 
                   <div className="flex items-center gap-4 w-full md:w-auto justify-end">
+                    <button 
+                      onClick={(e) => { 
+                        e.stopPropagation(); 
+                        handleDownloadDayCSV(day); 
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-primary-50 hover:bg-primary-100 text-primary-600 font-bold text-xs rounded-xl transition-all border border-primary-100 shadow-sm"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Download
+                    </button>
                     <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-xl text-slate-600 font-bold text-sm">
                       <Calendar className="w-4 h-4" />
                       Actions
