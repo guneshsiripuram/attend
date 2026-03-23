@@ -267,15 +267,26 @@ const AdminDashboard = () => {
   const handleDownloadMatrix = () => {
     if (!matrixData.rows.length) return alert('No data to export');
     
-    const headers = ['S.No', 'Roll Number', 'Name', 'Branch', 'Section', ...matrixData.dates.map(d => new Date(d).toLocaleDateString('en-IN'))];
-    const rows = matrixData.rows.map(r => [
-      r.sn,
-      r.roll,
-      r.name,
-      r.branch,
-      r.section,
-      ...matrixData.dates.map(d => r.attendance[d] || '-')
-    ]);
+    const headers = [
+      'S.No', 'Roll Number', 'Name', 'Branch', 'Section', 
+      ...matrixData.dates.map(d => new Date(d).toLocaleDateString('en-IN')),
+      'Total Days', 'No. of Presentees'
+    ];
+    const rows = matrixData.rows.map(r => {
+      const attendanceValues = matrixData.dates.map(d => r.attendance[d] || '-');
+      const presentCount = attendanceValues.filter(v => v === 'P').length;
+      
+      return [
+        r.sn,
+        r.roll,
+        r.name,
+        r.branch,
+        r.section,
+        ...attendanceValues,
+        matrixData.dates.length,
+        presentCount
+      ];
+    });
 
     const csvContent = [headers.join(','), ...rows.map(row => row.map(cell => `"${cell || ''}"`).join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
