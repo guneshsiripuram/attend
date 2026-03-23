@@ -230,7 +230,7 @@ const StudentDashboard = ({ user }) => {
                       <p className="font-semibold text-sm">
                         {new Date(log.timestamp).toLocaleDateString()} - 
                         <span className="ml-1 text-primary-600">
-                          {new Date(log.timestamp).getHours() < 12 ? 'Morning' : 'Afternoon'}
+                          {new Date(new Date(log.timestamp).toLocaleString("en-US", {timeZone: "Asia/Kolkata"})).getHours() < 12 ? 'Morning' : 'Afternoon'}
                         </span>
                       </p>
                       <p className="text-xs text-slate-500">{new Date(log.timestamp).toLocaleTimeString()}</p>

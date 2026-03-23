@@ -190,21 +190,35 @@ const AdminDashboard = () => {
   };
 
   const handleDownloadReport = () => {
-    if (!data || data.length === 0) {
-      alert('No data to export');
+    // Determine which dataset to export based on active tab
+    let exportData = [];
+    let filename = `Attendance_Report_${filters.date || 'Export'}.csv`;
+
+    if (activeTab === 'attendance') {
+      exportData = data;
+    } else if (activeTab === 'roster') {
+      exportData = rosterData;
+      filename = `Live_Roster_${filters.date || 'Export'}.csv`;
+    } else if (activeTab === 'history') {
+      alert('Please use the "Download" button inside the Daily History section to export historical records.');
       return;
     }
 
-    // Create CSV header
+    if (!exportData || exportData.length === 0) {
+      alert('No data to export for current view');
+      return;
+    }
+
+    // Create CSV header (Now including more student details)
     const headers = ['Name', 'Roll Number', 'Branch', 'Section', 'Email', 'Date', 'Time', 'Status'];
     
     // Convert data to rows
-    const rows = data.map(log => [
+    const rows = exportData.map(log => [
       log.full_name,
       log.roll_number,
-      log.branch,
-      log.section,
-      log.college_email,
+      log.branch || '--',
+      log.section || '--',
+      log.college_email || log.email || '--',
       new Date(log.timestamp).toLocaleDateString(),
       new Date(log.timestamp).toLocaleTimeString(),
       log.status
@@ -213,7 +227,7 @@ const AdminDashboard = () => {
     // Combine headers and rows
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ...rows.map(row => row.map(cell => `"${cell || ''}"`).join(','))
     ].join('\n');
 
     // Create blob and trigger download
@@ -221,7 +235,7 @@ const AdminDashboard = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `Attendance_Report_${filters.date || 'Export'}.csv`);
+    link.setAttribute('download', filename);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();

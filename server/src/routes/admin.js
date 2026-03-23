@@ -202,7 +202,7 @@ router.get('/attendance/history', authMiddleware, adminMiddleware, async (req, r
 
     const q = `
       SELECT 
-        DATE(al.timestamp) as date,
+        (al.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date as date,
         COUNT(DISTINCT al.user_id) as present_count,
         json_agg(json_build_object(
           'id', al.id,
@@ -218,8 +218,8 @@ router.get('/attendance/history', authMiddleware, adminMiddleware, async (req, r
       FROM attendance_logs al
       JOIN users u ON al.user_id = u.id
       WHERE al.status = 'Present'
-      GROUP BY DATE(al.timestamp)
-      ORDER BY DATE(al.timestamp) DESC
+      GROUP BY (al.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date
+      ORDER BY (al.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date DESC
     `;
     const result = await query(q);
 
