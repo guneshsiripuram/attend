@@ -242,18 +242,7 @@ const Register = () => {
               </select>
             </div>
 
-            {!googleUser && (
-              <div className="flex gap-6 mt-2 p-4 bg-slate-50 rounded-2xl">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" value="student" checked={formData.role === 'student'} onChange={(e) => setFormData({...formData, role: e.target.value})} className="accent-primary-600" />
-                  <span className="text-sm font-bold text-slate-600">Student</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" value="admin" checked={formData.role === 'admin'} onChange={(e) => setFormData({...formData, role: e.target.value})} className="accent-primary-600" />
-                  <span className="text-sm font-bold text-slate-600">Admin</span>
-                </label>
-              </div>
-            )}
+
           </div>
 
           {formData.role === 'student' && (

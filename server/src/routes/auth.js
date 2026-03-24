@@ -86,18 +86,10 @@ router.post('/register', async (req, res) => {
   console.log('--- REGISTRATION REQUEST START ---');
   console.log('Body:', { ...req.body, images: req.body.images ? `${req.body.images.length} frames` : 'none' });
   
-  let { full_name, roll_number, section, branch, college_email, password, role, face_descriptor, face_embedding, image } = req.body;
+  let { full_name, roll_number, section, branch, college_email, password } = req.body;
   
-  // Normalize role
-  const normalizedRole = (role || 'student').toLowerCase().trim();
-
-  // Handle minimal admin registration data
-  if (normalizedRole === 'admin') {
-    if (!full_name) full_name = college_email;
-    roll_number = roll_number || null;
-    section = section || null;
-    branch = branch || null;
-  }
+  // FORCE SECURITY: Only students can register via this public endpoint.
+  const normalizedRole = 'student';
 
   // Safety: If section has hyphen (e.g. CSE-A) and branch is missing, decouple them
   if (section && section.includes('-') && !branch) {
