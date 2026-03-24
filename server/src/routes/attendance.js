@@ -152,7 +152,7 @@ router.post('/verify', authMiddleware, async (req, res) => {
     const similarity = 1 - faceDistance; 
     
     console.log(`[DEBUG] Comparison: FaceDistance=${faceDistance.toFixed(4)}, Similarity=${similarity.toFixed(4)}`);
-    const threshold = 0.40;
+    const threshold = 0.55;
 
     if (similarity < threshold) {
       console.log(`[DEBUG] Match failed: ${similarity} < ${threshold}`);
