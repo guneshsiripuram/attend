@@ -251,6 +251,7 @@ router.get('/session', authMiddleware, async (req, res) => {
     }
 
     // Attach current server time to help frontend calculate relative countdowns/status
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.json({
         ...session,
         server_time: new Date()
@@ -285,7 +286,12 @@ router.post('/session/toggle', authMiddleware, adminMiddleware, async (req, res)
       [isOpen, startsAt, expiresAt]
     );
     
-    res.json({ message: `Attendance gate ${isOpen ? (startTime ? 'SCHEDULED' : 'OPEN') : 'CLOSED'}`, startsAt, expiresAt });
+    res.json({ 
+      message: `Attendance gate ${isOpen ? (startTime ? 'SCHEDULED' : 'OPEN') : 'CLOSED'}`, 
+      startsAt, 
+      expiresAt,
+      serverTime: new Date() 
+    });
   } catch (error) {
     console.error('--- SESSION_TOGGLE_ERROR ---');
     console.error('Error details:', error.message);

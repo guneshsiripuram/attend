@@ -125,7 +125,7 @@ const AdminDashboard = () => {
         is_open: !session.is_open, 
         starts_at: resp.data.startsAt, 
         expires_at: resp.data.expiresAt, 
-        server_time: new Date() 
+        server_time: resp.data.serverTime 
       });
       if (startTime) {
         setScheduleStart('');

@@ -307,15 +307,26 @@ const StudentDashboard = ({ user }) => {
                       {session.isExpired ? 'Session Expired' : 'Sync Error'}
                     </span>
                  </div>
-                 <p className="text-[8px] text-red-400 font-bold mb-1">{session.errorMessage}</p>
-                 {session.isExpired && (
-                   <button 
-                     onClick={() => navigate('/login')}
-                     className="mt-1 px-3 py-1 bg-red-600 text-white text-[9px] font-black rounded-lg hover:bg-red-700 transition-all uppercase tracking-widest"
-                   >
-                     Log In Again
-                   </button>
-                 )}
+                 <p className="text-[8px] text-red-400 font-bold mb-1 text-center">{session.errorMessage}</p>
+                 <div className="flex gap-2">
+                    {session.isExpired ? (
+                      <button 
+                        onClick={() => navigate('/login')}
+                        className="px-3 py-1 bg-red-600 text-white text-[9px] font-black rounded-lg hover:bg-red-700 transition-all uppercase tracking-widest"
+                      >
+                        Log In Again
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={checkSession}
+                        disabled={isSessionLoading}
+                        className="px-3 py-1 bg-slate-800 text-white text-[9px] font-black rounded-lg hover:bg-slate-900 transition-all uppercase tracking-widest flex items-center gap-1"
+                      >
+                        {isSessionLoading ? <Loader2 className="w-2 h-2 animate-spin" /> : <RotateCcw className="w-2 h-2" />}
+                        Sync Now
+                      </button>
+                    )}
+                 </div>
               </div>
             )}
          </div>

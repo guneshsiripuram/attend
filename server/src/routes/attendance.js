@@ -238,6 +238,7 @@ router.get('/session', authMiddleware, async (req, res) => {
       console.log('--- STUDENT SESSION AUTO-CLOSED (EXPIRED) ---');
     }
 
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.json({
       ...session,
       server_time: new Date()
