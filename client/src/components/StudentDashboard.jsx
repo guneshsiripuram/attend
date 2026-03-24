@@ -68,8 +68,9 @@ const StudentDashboard = ({ user }) => {
       setSession(response.data);
     } catch (err) {
       console.error('Failed to fetch session', err);
-      const msg = err.response?.data?.message || err.message || 'Sync Error';
-      setSession({ is_open: false, expires_at: null, error: true, errorMessage: msg });
+      const statusCode = err.response?.status ? `[${err.response.status}] ` : '';
+      const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Sync Error';
+      setSession({ is_open: false, expires_at: null, error: true, errorMessage: `${statusCode}${msg}` });
     } finally {
       setIsSessionLoading(false);
     }
