@@ -132,7 +132,8 @@ const AdminDashboard = () => {
         setScheduleEnd('');
       }
     } catch (err) {
-      alert('Failed to update session');
+      const errorMsg = err.response?.data?.error || err.response?.data?.message || err.message;
+      alert('Failed to update session: ' + errorMsg);
     } finally {
       setSessionLoading(false);
     }
