@@ -839,48 +839,46 @@ const AdminDashboard = () => {
             </div>
             
             <div className="flex-1 overflow-auto relative custom-scrollbar">
-              <table className="w-full text-left border-collapse min-w-max">
-                <thead className="sticky top-0 z-40 bg-slate-50 border-b border-slate-200">
-                      <tr className="bg-slate-50/50">
-                          <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">SN</th>
-                          <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Roll Number</th>
-                          <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Student Name</th>
-                          {matrixData.dates.map(date => (
-                            <th key={date} className="px-4 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap italic">
-                              {new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                            </th>
-                          ))}
-                          <th className="px-6 py-4 text-center text-[10px] font-black text-primary-600 uppercase tracking-widest whitespace-nowrap sticky right-[72px] bg-slate-50 shadow-[-10px_0_10px_-10px_rgba(0,0,0,0.1)] z-10">Total</th>
-                          <th className="px-6 py-4 text-center text-[10px] font-black text-green-600 uppercase tracking-widest whitespace-nowrap sticky right-0 bg-slate-50 z-10">Present</th>
-                        </tr>
+              <table className="w-full text-left border-separate border-spacing-0 min-w-max">
+                <thead className="sticky top-0 z-40 bg-slate-50">
+                  <tr>
+                    <th className="sticky left-0 z-50 bg-slate-50 px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest border-r border-slate-200 min-w-[50px] w-[50px]">SN</th>
+                    <th className="sticky left-[50px] z-50 bg-slate-50 px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest border-r border-slate-200 min-w-[110px] w-[110px]">Roll Number</th>
+                    <th className="sticky left-[160px] z-50 bg-slate-50 px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest border-r border-slate-200 min-w-[200px] w-[200px]">Student Name</th>
+                    {matrixData.dates.map(date => (
+                      <th key={date} className="px-3 py-4 text-[9px] font-black text-slate-500 uppercase tracking-tighter text-center min-w-[60px] border-r border-slate-100 italic bg-slate-50">
+                        {new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                      </th>
+                    ))}
+                    <th className="sticky right-[80px] z-50 bg-slate-50 px-4 py-4 text-[10px] font-black text-primary-600 uppercase tracking-widest border-l border-slate-200 shadow-[-5px_0_5px_-5px_rgba(0,0,0,0.1)] min-w-[70px] w-[70px]">Total</th>
+                    <th className="sticky right-0 z-50 bg-slate-50 px-4 py-4 text-[10px] font-black text-green-600 uppercase tracking-widest border-l border-slate-200 min-w-[80px] w-[80px]">Present</th>
+                  </tr>
                 </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
                       {matrixData.rows.map((row, idx) => {
                         const presentCount = matrixData.dates.filter(d => row.attendance[d] === 'P' || row.attendance[d] === 'M').length;
                         return (
                           <tr key={row.roll} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="px-6 py-4 whitespace-nowrap text-xs font-bold text-slate-400">{idx + 1}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-xs font-black text-slate-900">{row.roll}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-xs font-bold text-slate-700">{row.name}</td>
+                            <td className="sticky left-0 z-30 bg-white px-4 py-3 text-xs font-bold text-slate-400 border-r border-slate-50">{idx + 1}</td>
+                            <td className="sticky left-[50px] z-30 bg-white px-4 py-3 text-[10px] font-black text-slate-900 border-r border-slate-50 uppercase">{row.roll}</td>
+                            <td className="sticky left-[160px] z-30 bg-white px-6 py-3 text-xs font-black text-slate-700 border-r border-slate-100 truncate max-w-[200px]">{row.name}</td>
                             {matrixData.dates.map(date => {
                               const status = row.attendance[date];
                               const displayStatus = status === 'M' ? 'P' : (status || '-');
                               return (
-                                <td key={date} className="px-4 py-4 whitespace-nowrap text-center">
-                                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg text-[10px] font-black ${
-                                    displayStatus === 'P' ? 'bg-green-50 text-green-600' :
-                                    displayStatus === 'A' ? 'bg-red-50 text-red-500' :
-                                    'bg-slate-50 text-slate-300'
-                                  }`}>
-                                    {displayStatus}
-                                  </span>
+                                <td key={date} className={`px-2 py-3 text-center border-r border-slate-50 text-[10px] font-black ${
+                                  displayStatus === 'P' ? 'text-green-600 bg-green-50/20' : 
+                                  displayStatus === 'A' ? 'text-red-500 bg-red-50/20' : 
+                                  'text-slate-300'
+                                }`}>
+                                  {displayStatus}
                                 </td>
                               );
                             })}
-                            <td className="px-6 py-4 whitespace-nowrap text-center text-xs font-bold text-primary-600 sticky right-[72px] bg-white/95 backdrop-blur-sm shadow-[-10px_0_10px_-10px_rgba(0,0,0,0.1)]">
+                            <td className="sticky right-[80px] z-30 bg-white px-4 py-3 text-[10px] font-black text-primary-600 border-l border-slate-50 text-center shadow-[-5px_0_5px_-5px_rgba(0,0,0,0.1)]">
                               {matrixData.dates.length}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center text-xs font-black text-green-600 sticky right-0 bg-white/95 backdrop-blur-sm">
+                            <td className="sticky right-0 z-30 bg-white px-4 py-3 text-[10px] font-black text-green-600 border-l border-slate-50 text-center">
                               {presentCount}
                             </td>
                           </tr>
