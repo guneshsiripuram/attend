@@ -196,9 +196,21 @@ router.get('/me', authMiddleware, async (req, res) => {
       [req.user.id]
     );
     
-    // Calculate stats dynamic based on unique capture days in system
-    const dayCountResult = await query('SELECT COUNT(DISTINCT "timestamp"::date) as count FROM attendance_logs');
-    const totalDays = parseInt(dayCountResult.rows[0].count) || 1; 
+    // Calculate total attendance days based on system-wide 'Full-Day' availability.
+    // A day is only counted if BOTH a morning and an afternoon session were successfully held.
+    const dayCountResult = await query(`
+      SELECT COUNT(*) as count FROM (
+        SELECT (timestamp AT TIME ZONE 'Asia/Kolkata')::date as day
+        FROM attendance_logs
+        WHERE status = 'Present'
+        GROUP BY (timestamp AT TIME ZONE 'Asia/Kolkata')::date
+        HAVING 
+          COUNT(CASE WHEN EXTRACT(HOUR FROM (timestamp AT TIME ZONE 'Asia/Kolkata')) < 12 THEN 1 END) > 0
+          AND
+          COUNT(CASE WHEN EXTRACT(HOUR FROM (timestamp AT TIME ZONE 'Asia/Kolkata')) >= 12 THEN 1 END) > 0
+      ) as full_days
+    `);
+    const totalDays = parseInt(dayCountResult.rows[0].count) || 0; 
 
     // Full-day logic: Must have at least one morning (<12) AND one afternoon (>=12) log (IST)
     const statsByDate = {};
@@ -216,7 +228,7 @@ router.get('/me', authMiddleware, async (req, res) => {
     });
 
     const presentDays = Object.values(statsByDate).filter(day => day.morning && day.afternoon).length;
-    const percentage = (presentDays / totalDays) * 100;
+    const percentage = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
 
     res.json({ logs: result.rows, stats: { percentage, present: presentDays, total: totalDays } });
   } catch (error) {
