@@ -26,7 +26,7 @@ This guide takes you through deploying your Attendance Portal for **FREE** witho
    - `COLLEGE_DOMAIN`: `@raghuenggcollege.in`
    - `CAMPUS_LAT`: `17.925615`
    - `CAMPUS_LNG`: `83.424361`
-   - `MAX_DISTANCE_METERS`: `100`
+   - `MAX_DISTANCE_METERS`: `500` (Recommended for reliability)
    - `GOOGLE_CLIENT_ID`: (The Client ID you got from Google)
 
 ## 3. Deploy Frontend (Netlify) - 100% Free
