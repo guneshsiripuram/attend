@@ -202,24 +202,31 @@ router.get('/attendance/history', authMiddleware, adminMiddleware, async (req, r
 
     const q = `
       SELECT 
-        (al.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date as date,
-        COUNT(DISTINCT al.user_id) as present_count,
+        date,
+        COUNT(*) as present_count,
         json_agg(json_build_object(
-          'id', al.id,
-          'timestamp', al.timestamp,
-          'status', al.status,
-          'user_id', al.user_id,
-          'full_name', u.full_name,
-          'roll_number', u.roll_number,
-          'email', u.college_email,
-          'section', u.section,
-          'branch', u.branch
-        ) ORDER BY al.timestamp DESC) as present_records
-      FROM attendance_logs al
-      JOIN users u ON al.user_id = u.id
-      WHERE al.status = 'Present'
-      GROUP BY (al.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date
-      ORDER BY (al.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date DESC
+          'id', id,
+          'timestamp', timestamp,
+          'status', status,
+          'user_id', user_id,
+          'full_name', full_name,
+          'roll_number', roll_number,
+          'email', college_email,
+          'section', section,
+          'branch', branch
+        ) ORDER BY timestamp DESC) as present_records
+      FROM (
+        SELECT DISTINCT ON (al.user_id, (al.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date)
+          al.id, al.timestamp, al.status, al.user_id,
+          u.full_name, u.roll_number, u.college_email, u.section, u.branch,
+          (al.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date as date
+        FROM attendance_logs al
+        JOIN users u ON al.user_id = u.id
+        WHERE al.status = 'Present'
+        ORDER BY al.user_id, (al.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date, al.timestamp DESC
+      ) unique_logs
+      GROUP BY date
+      ORDER BY date DESC
     `;
     const result = await query(q);
 
