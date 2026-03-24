@@ -19,14 +19,8 @@ const Register = () => {
     password: '',
     role: 'student'
   });
-  const [isRecording, setIsRecording] = useState(false);
-  const [capturedFrames, setCapturedFrames] = useState([]);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [cameraError, setCameraError] = useState('');
-  const [isCameraReady, setIsCameraReady] = useState(false);
-  const webcamRef = useRef(null);
+  const [enrollmentStep, setEnrollmentStep] = useState(0); // 0: Front, 1: Left, 2: Right
+  const [enrolledSamples, setEnrolledSamples] = useState([]); // Array of 3 descriptors
   const recordingTimer = useRef(null);
   const navigate = useNavigate();
 
@@ -57,25 +51,39 @@ const Register = () => {
 
   const startRecording = () => {
     setIsRecording(true);
-    setCapturedFrames([]);
-    let count = 0;
+    setError('');
     
-    recordingTimer.current = setInterval(() => {
-      if (count < 10) {
-        const frame = webcamRef.current.getScreenshot();
-        if (frame) {
-          setCapturedFrames(prev => [...prev, frame]);
+    // Capture burst for current pose
+    setTimeout(async () => {
+      const frame = webcamRef.current.getScreenshot();
+      if (frame) {
+        try {
+          const detection = await FaceService.getDescriptorFromBase64(frame);
+          const quality = FaceService.getFaceQuality(detection);
+          
+          if (!quality.isGood) {
+            setError(`Step ${enrollmentStep + 1} Failed: ${quality.reason}. Please try again.`);
+            setIsRecording(false);
+            return;
+          }
+          
+          setEnrolledSamples(prev => {
+            const next = [...prev];
+            next[enrollmentStep] = Array.from(detection.descriptor);
+            return next;
+          });
+          
+          if (enrollmentStep < 2) {
+            setEnrollmentStep(prev => prev + 1);
+          } else {
+            setSuccess('All poses captured successfully!');
+          }
+        } catch (err) {
+          setError('Face detection failed. Ensure good lighting.');
         }
-        count++;
-      } else {
-        stopRecording();
       }
-    }, 500); 
-  };
-
-  const stopRecording = () => {
-    clearInterval(recordingTimer.current);
-    setIsRecording(false);
+      setIsRecording(false);
+    }, 1000);
   };
 
   const handleSubmit = async (e) => {
@@ -89,19 +97,13 @@ const Register = () => {
 
     setLoading(true);
     try {
-      let face_descriptor = null;
+      let face_descriptors = null;
 
       if (formData.role === 'student') {
-        const descriptors = [];
-        for (const frame of capturedFrames) {
-          const desc = await FaceService.getDescriptorFromBase64(frame);
-          if (desc) descriptors.push(desc);
+        if (enrolledSamples.length < 3) {
+          throw new Error('Please complete all 3 enrollment steps.');
         }
-
-        if (descriptors.length === 0) {
-          throw new Error('No face detected. Please try again with better lighting.');
-        }
-        face_descriptor = FaceService.averageDescriptors(descriptors);
+        face_descriptors = enrolledSamples;
       }
 
       if (googleUser) {
@@ -110,14 +112,14 @@ const Register = () => {
           roll_number: formData.roll_number,
           branch: formData.branch,
           section: formData.section,
-          face_descriptor
+          face_descriptor: face_descriptors // Send array
         });
         setSuccess('Profile completed! Redirecting to Dashboard...');
         setTimeout(() => navigate('/student'), 2000);
       } else {
         await axios.post('/auth/register', {
           ...formData,
-          face_descriptor 
+          face_descriptor: face_descriptors // Send array
         });
         setSuccess('Account created! Redirecting to login...');
         setTimeout(() => navigate('/login'), 2000);
@@ -257,7 +259,10 @@ const Register = () => {
 
           {formData.role === 'student' && (
             <div className="flex flex-col gap-6">
-              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2">Face Enrollment</h3>
+                          <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2 flex justify-between items-center">
+              <span>Face Enrollment</span>
+              {enrolledSamples.length > 0 && <span className="text-primary-500">{enrolledSamples.filter(Boolean).length}/3 Steps</span>}
+            </h3>
               <div className="relative w-full aspect-square bg-slate-100 rounded-3xl overflow-hidden ring-4 ring-slate-50 group">
                 <Webcam
                   audio={false}
@@ -284,26 +289,24 @@ const Register = () => {
                   </div>
                 )}
 
-                {isCameraReady && isRecording && (
-                  <div className="absolute top-6 left-6 flex items-center gap-3 bg-red-500 text-white px-4 py-2 rounded-2xl animate-pulse shadow-2xl z-30">
-                    <div className="w-2 h-2 bg-white rounded-full"></div>
-                    <span className="text-[10px] font-black uppercase">Recording: {capturedFrames.length}/10</span>
+                <div className="absolute top-6 right-6 z-40">
+                  <div className="bg-white/90 backdrop-blur px-3 py-1 rounded-lg border border-slate-200 shadow-sm">
+                    <p className="text-[8px] font-black uppercase text-slate-500">Pose {enrollmentStep + 1}</p>
+                    <p className="text-[10px] font-bold text-slate-800">
+                      {enrollmentStep === 0 ? 'Look Straight' : enrollmentStep === 1 ? 'Tilt Left' : 'Tilt Right'}
+                    </p>
                   </div>
-                )}
-                
+                </div>
+
                 <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-40">
                   <button
                     type="button"
-                    onClick={isRecording ? stopRecording : startRecording}
-                    disabled={loading}
-                    className={`py-4 px-8 rounded-2xl shadow-2xl transition-all flex items-center gap-3 font-black text-sm uppercase tracking-wider ${
-                      isRecording 
-                        ? 'bg-red-500 text-white hover:bg-red-600' 
-                        : 'bg-primary-600 text-white hover:bg-primary-700'
-                    }`}
+                    onClick={startRecording}
+                    disabled={loading || isRecording}
+                    className={`py-4 px-8 rounded-2xl shadow-2xl transition-all flex items-center gap-3 font-black text-sm uppercase tracking-wider bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50`}
                   >
-                    <Camera className="w-5 h-5" />
-                    <span>{isRecording ? 'Stop' : (capturedFrames.length > 0 ? 'Retry Enrollment' : 'Start Enrollment')}</span>
+                    {isRecording ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
+                    <span>{enrolledSamples[enrollmentStep] ? 'Retake Pose' : `Capture Pose ${enrollmentStep + 1}`}</span>
                   </button>
                 </div>
               </div>

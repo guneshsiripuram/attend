@@ -115,10 +115,10 @@ router.post('/verify', authMiddleware, async (req, res) => {
 
 
 
-    // 3. Process Live Identity (Option 2: Direct Descriptor from Client)
+    // 3. Process Live Identity (Burst of descriptors from Client)
     const { face_descriptor } = req.body;
     
-    if (!face_descriptor) {
+    if (!face_descriptor || (Array.isArray(face_descriptor) && face_descriptor.length === 0)) {
       return res.status(400).json({ message: 'Missing facial data for verification.' });
     }
 
@@ -133,26 +133,16 @@ router.post('/verify', authMiddleware, async (req, res) => {
         }
     }
 
-    const finalStored = Array.isArray(storedEmbedding) ? storedEmbedding : (storedEmbedding?.descriptor || storedEmbedding);
-    
-    if (!finalStored) {
-      return res.status(400).json({ 
-        message: 'Face enrollment required. Please register your face first.',
-        needsEnrollment: true 
-      });
-    }
-
     const { compareDescriptors } = require('../utils/faceUtils');
     
-    // Detailed logging for debugging
-    console.log(`[DEBUG] FinalStored: type=${typeof finalStored}, isArray=${Array.isArray(finalStored)}, len=${finalStored?.length}`);
-    console.log(`[DEBUG] ProvidedDescriptor: type=${typeof face_descriptor}, isArray=${Array.isArray(face_descriptor)}, len=${face_descriptor?.length}`);
-    
-    const faceDistance = compareDescriptors(finalStored, face_descriptor);
+    // compareDescriptors now handles (GallerySet, ProbeSet) and returns MIN distance
+    const faceDistance = compareDescriptors(storedEmbedding, face_descriptor);
     const similarity = 1 - faceDistance; 
     
-    console.log(`[DEBUG] Comparison: FaceDistance=${faceDistance.toFixed(4)}, Similarity=${similarity.toFixed(4)}`);
-    const threshold = 0.55;
+    console.log(`[DEBUG] Burst Comparison: Best Distance=${faceDistance.toFixed(4)}, Similarity=${similarity.toFixed(4)}`);
+    
+    // With multi-sample matching, we can keep 0.55 or slightly increase to 0.60 for even higher security.
+    const threshold = 0.58; 
 
     if (similarity < threshold) {
       console.log(`[DEBUG] Match failed: ${similarity} < ${threshold}`);
@@ -160,7 +150,11 @@ router.post('/verify', authMiddleware, async (req, res) => {
         'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',
         [userId, user.roll_number, user.section, 'Failed_Face', JSON.stringify({ ...location, similarity: similarity.toFixed(4) })]
       );
-      return res.status(403).json({ message: 'Match Failed', details: 'The face captured does not match your registered profile. Please ensure your face is clearly visible and well-lit.', similarity });
+      return res.status(403).json({ 
+        message: 'Identity Not Confident', 
+        details: 'Biometric match score was below the required security threshold. Please ensure you are not using a photo and blink clearly.',
+        similarity 
+      });
     }
 
     console.log(`[DEBUG] Verification Successful! Recording attendance...`);

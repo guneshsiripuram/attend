@@ -130,7 +130,7 @@ router.post('/register', async (req, res) => {
     console.log('Inserting user into database...');
     const result = await query(
       'INSERT INTO users (full_name, roll_number, section, branch, college_email, password_hash, role, face_embedding) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, full_name, roll_number, section, branch, role',
-      [full_name, roll_number, section, branch, emailLower, hashedPassword, normalizedRole, JSON.stringify(finalEmbedding)]
+      [full_name, roll_number, section, branch, emailLower, hashedPassword, normalizedRole, JSON.stringify(finalEmbedding)] // This is now an array
     );
 
     console.log('User registered successfully');
@@ -191,7 +191,7 @@ router.post('/complete-profile', async (req, res) => {
     console.log('Completing profile for:', email);
     const result = await query(
       'UPDATE users SET roll_number = $1, section = $2, branch = $3, face_embedding = $4 WHERE college_email = $5 RETURNING *',
-      [roll_number, section, branch, JSON.stringify(face_descriptor), email.toLowerCase().trim()]
+      [roll_number, section, branch, JSON.stringify(face_descriptor), email.toLowerCase().trim()] // face_descriptor is now an array
     );
 
     if (result.rows.length === 0) {

@@ -12,6 +12,8 @@ const StudentDashboard = ({ user }) => {
   const webcamRef = useRef(null);
   const [isAutoMode, setIsAutoMode] = useState(true);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [livenessStatus, setLivenessStatus] = useState('idle'); // idle, challenge, success, failed
+  const [blinkDetected, setBlinkDetected] = useState(false);
   const [result, setResult] = useState(null);
   const [history, setHistory] = useState([]);
   const [stats, setStats] = useState({ percentage: 0, present: 0, total: 0 });
@@ -101,73 +103,90 @@ const StudentDashboard = ({ user }) => {
     return () => clearInterval(interval);
   }, []);
 
-  const handleVerify = async (manualImage = null) => {
-    if (isVerifying || !isModelsLoaded || !session.is_open) return;
-    
-    const imageToVerify = manualImage || webcamRef.current.getScreenshot();
-    if (!imageToVerify) return;
-
-    
+  const handleVerify = async () => {
+    if (isVerifying || livenessStatus === 'challenge') return;
     setIsVerifying(true);
-    setResult(null); // Clear previous results immediately
+    setLivenessStatus('challenge');
+    setBlinkDetected(false);
+    setResult(null);
+
+    // 1. Liveness Step: Blink Detection
+    let blinkFound = false;
+    const startLiveness = Date.now();
     
-    const performVerify = async (lat, lng) => {
-      try {
-        let descriptor = await FaceService.getDescriptorFromBase64(imageToVerify);
-        if (!descriptor) {
-          throw new Error('No face detected. Please ensure your face is clearly visible.');
+    const livenessInterval = setInterval(async () => {
+      const frame = webcamRef.current.getScreenshot();
+      if (frame) {
+        const detection = await FaceService.getDescriptorFromBase64(frame);
+        if (FaceService.detectBlink(detection)) {
+          blinkFound = true;
+          setBlinkDetected(true);
+          setLivenessStatus('success');
+          clearInterval(livenessInterval);
+          performBurstCapture();
         }
-
-        // Convert Float32Array to plain array for JSON serialization
-        if (descriptor instanceof Float32Array || typeof descriptor.length === 'number') {
-          descriptor = Array.from(descriptor);
-        }
-
-        const resp = await axios.post('/attendance/verify', {
-          face_descriptor: descriptor,
-          isAuto: true,
-          location: { lat, lng }
-        });
-        setResult({ 
-          success: true, 
-          message: resp.data.message,
-          student: resp.data.student 
-        });
-        fetchHistory();
-        setIsAutoMode(false); 
-      } catch (err) {
-        console.error('Verification error:', err);
-        const errorMsg = err.response?.data?.message || err.message || 'Verification failed';
-        const details = err.response?.data?.details;
-        setResult({ success: false, message: errorMsg, details });
-        
-        if (err.response?.status === 403) {
-          setIsAutoMode(false);
-        }
-      } finally {
+      }
+      
+      // Timeout liveness after 10 seconds
+      if (Date.now() - startLiveness > 10000 && !blinkFound) {
+        clearInterval(livenessInterval);
+        setLivenessStatus('failed');
+        setResult({ success: false, message: 'Liveness failed: No blink detected. Please try again.' });
         setIsVerifying(false);
       }
-    };
+    }, 200);
+  };
 
-    if (currLocation) {
-      await performVerify(currLocation.lat, currLocation.lng);
-    } else if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setCurrLocation(loc);
-          performVerify(loc.lat, loc.lng);
-        },
-        (err) => {
-          setResult({ success: false, message: 'Location access denied.' });
-          setIsVerifying(false);
-        },
-        { timeout: 5000 }
-      );
-    } else {
-      setResult({ success: false, message: 'Geolocation not supported' });
-      setIsVerifying(false);
+  const performBurstCapture = async () => {
+    // 2. Burst Capture: Take 5 frames quickly
+    const burstDescriptors = [];
+    for (let i = 0; i < 5; i++) {
+      const frame = webcamRef.current.getScreenshot();
+      if (frame) {
+        const detection = await FaceService.getDescriptorFromBase64(frame);
+        if (detection && FaceService.getFaceQuality(detection).isGood) {
+          burstDescriptors.push(Array.from(detection.descriptor));
+        }
+      }
+      await new Promise(r => setTimeout(r, 200));
     }
+
+    if (burstDescriptors.length === 0) {
+      setResult({ success: false, message: 'Could not capture high-quality face samples. Adjust lighting.' });
+      setIsVerifying(false);
+      setLivenessStatus('idle');
+      return;
+    }
+
+    // 3. Location and Submit
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const loc = { lat: position.coords.latitude, lng: position.coords.longitude };
+          const response = await axios.post('/attendance/verify', {
+            face_descriptor: burstDescriptors, // Send burst array
+            location: loc
+          });
+          setResult({ success: true, message: response.data.message });
+          setLivenessStatus('idle');
+          fetchHistory();
+        } catch (err) {
+          setResult({ 
+            success: false, 
+            message: err.response?.data?.message || 'Verification failed. Try again.' 
+          });
+          setLivenessStatus('idle');
+        } finally {
+          setIsVerifying(false);
+        }
+      },
+      (err) => {
+        setResult({ success: false, message: 'Location access denied.' });
+        setIsVerifying(false);
+        setLivenessStatus('idle');
+      },
+      { timeout: 5000 }
+    );
   };
 
   // Adaptive Auto-Verify Loop
@@ -408,12 +427,30 @@ const StudentDashboard = ({ user }) => {
 
               {/* No need for duplicate overlay here, handled by the main glass container overlay */}
 
-              {!isCameraReady && !cameraError && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950">
-                  <Loader2 className="w-10 h-10 text-primary-500 animate-spin mb-4" />
-                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Initializing Vision AI</p>
-                </div>
-              )}
+               {/* Liveness Challenge Overlay */}
+               {isVerifying && livenessStatus === 'challenge' && (
+                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-primary-600/90 backdrop-blur-md z-50 transition-all duration-500">
+                    <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mb-6 animate-pulse border-4 border-white/30">
+                       <Camera className="w-10 h-10 text-white" />
+                    </div>
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-2 animate-bounce">Blink Now!</h3>
+                    <p className="text-white/80 text-xs font-bold text-center px-12 leading-relaxed">
+                       We need to verify you are a live person.<br/>
+                       Please blink your eyes clearly at the camera.
+                    </p>
+                    <div className="mt-10 flex gap-2">
+                       <div className={`w-3 h-3 rounded-full transition-all duration-300 ${blinkDetected ? 'bg-green-400 scale-125' : 'bg-white/20'}`}></div>
+                    </div>
+                 </div>
+               )}
+
+               {isVerifying && livenessStatus === 'success' && (
+                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-green-600/90 backdrop-blur-md z-50 animate-fade-in">
+                    <CheckCircle className="w-16 h-16 text-white mb-4 animate-scale-in" />
+                    <h3 className="text-xl font-black text-white uppercase tracking-tighter">Liveness Verified!</h3>
+                    <p className="text-white/80 text-xs font-bold uppercase tracking-widest mt-2">Capturing biometric burst...</p>
+                 </div>
+               )}
 
               {cameraError && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 p-8 text-center ring-inset ring-2 ring-red-500/20">
