@@ -332,6 +332,18 @@ router.get('/attendance/matrix', authMiddleware, adminMiddleware, async (req, re
     const matrix = {};
     const uniqueDates = new Set();
 
+    // Ensure today's date is included if it's within range
+    const todayIST = new Intl.DateTimeFormat('en-CA', { 
+      timeZone: 'Asia/Kolkata', 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit' 
+    }).format(new Date());
+    
+    if ((!startDate || todayIST >= startDate) && (!endDate || todayIST <= endDate)) {
+      uniqueDates.add(todayIST);
+    }
+
     logsResult.rows.forEach(log => {
       const dateStr = new Date(log.date).toISOString().split('T')[0];
       uniqueDates.add(dateStr);
