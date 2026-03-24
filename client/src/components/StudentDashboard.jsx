@@ -21,8 +21,9 @@ const StudentDashboard = ({ user }) => {
   const autoVerifyTimeout = useRef(null);
   
   // Session Gates
-  const [session, setSession] = useState({ is_open: false, expires_at: null });
+  const [session, setSession] = useState({ is_open: false, expires_at: null, starts_at: null, server_time: null });
   const [isSessionLoading, setIsSessionLoading] = useState(true);
+  const [serverTimeOffset, setServerTimeOffset] = useState(0); // Offset in ms: ServerTime - LocalTime
 
   console.log('StudentDashboard rendering, user:', user?.email);
 
@@ -62,9 +63,17 @@ const StudentDashboard = ({ user }) => {
 
   const checkSession = async () => {
     console.log('Checking session...');
+    const localBefore = Date.now();
     try {
       const response = await axios.get('/attendance/session');
-      console.log('Session response:', response.data);
+      const localAfter = Date.now();
+      const serverTime = new Date(response.data.server_time).getTime();
+      // Estimate server time at the moment of arrival (avg of request/response trip)
+      const estimatedLocalAtServer = (localBefore + localAfter) / 2;
+      const offset = serverTime - estimatedLocalAtServer;
+      
+      setServerTimeOffset(offset);
+      console.log('Session response:', response.data, 'Clock Offset (ms):', offset);
       setSession({ ...response.data, error: false, isExpired: false });
     } catch (err) {
       console.error('Failed to fetch session', err);
@@ -75,6 +84,7 @@ const StudentDashboard = ({ user }) => {
       setSession({ 
         is_open: false, 
         expires_at: null, 
+        starts_at: null,
         error: true, 
         isExpired: isAuthError,
         errorMessage: isAuthError ? 'Your session has expired. Please log out and back in.' : `${statusCode}${msg}` 
@@ -176,8 +186,10 @@ const StudentDashboard = ({ user }) => {
   ];
   const COLORS = ['#0ea5e9', '#e2e8f0'];
 
-  const isTrulyOpen = session.is_open && (!session.starts_at || new Date(session.starts_at) <= (session.server_time ? new Date(session.server_time) : new Date()));
-  const isScheduled = !isTrulyOpen && session.is_open && session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date());
+  const getServerNow = useCallback(() => new Date(Date.now() + serverTimeOffset), [serverTimeOffset]);
+  
+  const isTrulyOpen = session.is_open && (!session.starts_at || new Date(session.starts_at) <= getServerNow());
+  const isScheduled = !isTrulyOpen && session.is_open && session.starts_at && new Date(session.starts_at) > getServerNow();
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
@@ -332,7 +344,7 @@ const StudentDashboard = ({ user }) => {
          </div>
 
          <div className="glass p-8 rounded-[2.5rem] shadow-2xl flex flex-col items-center gap-8 min-h-[600px] border border-white/50 relative overflow-hidden">
-            {!session.is_open && (
+            {!isTrulyOpen && (
               <div className="absolute inset-0 z-40 bg-slate-900/5 backdrop-blur-[1px] flex items-center justify-center p-8 transition-opacity duration-500">
                  <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 max-w-sm text-center space-y-4 transform translate-y-[-20px]">
                     <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto ${isScheduled ? 'bg-amber-50' : 'bg-red-50'}`}>
@@ -394,38 +406,7 @@ const StudentDashboard = ({ user }) => {
               <div className="absolute bottom-8 left-8 w-8 h-8 border-b-4 border-l-4 border-white/40 rounded-bl-lg"></div>
               <div className="absolute bottom-8 right-8 w-8 h-8 border-b-4 border-r-4 border-white/40 rounded-br-lg"></div>
 
-              {/* Gate Closed Overlay */}
-              {!isSessionLoading && !session.is_open && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-md z-30 transition-all duration-500">
-                   {isScheduled ? (
-                     <div className="flex flex-col items-center justify-center">
-                       <div className="w-20 h-20 bg-slate-900 rounded-3xl flex items-center justify-center mb-6 shadow-2xl border border-amber-500/20 animate-pulse">
-                          <Clock className="w-10 h-10 text-amber-500" />
-                       </div>
-                       <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-2">Upcoming Schedule</h3>
-                       <p className="text-slate-400 text-xs font-bold text-center px-8 leading-relaxed">
-                          Attendance is scheduled to begin at<br/>
-                          <span className="text-amber-500">{new Date(session.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>. Please be ready.
-                       </p>
-                     </div>
-                   ) : (
-                     <div className="flex flex-col items-center justify-center">
-                       <div className="w-20 h-20 bg-slate-900 rounded-3xl flex items-center justify-center mb-6 shadow-2xl border border-white/5 animate-bounce-subtle">
-                          <ShieldCheck className="w-10 h-10 text-slate-500" />
-                       </div>
-                       <h3 className="text-xl font-black text-white uppercase tracking-tighter mb-2">Portal is CLOSED</h3>
-                       <p className="text-slate-400 text-xs font-bold text-center px-8 leading-relaxed">
-                          This is not the time to take attendance.<br/>
-                          Please check with your faculty for the schedule.
-                       </p>
-                       <div className="mt-8 px-4 py-2 bg-white/5 rounded-full border border-white/10 flex items-center gap-2">
-                          <Lock className="w-3 h-3 text-slate-500" />
-                          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">Access Locked</span>
-                       </div>
-                     </div>
-                   )}
-                </div>
-              )}
+              {/* No need for duplicate overlay here, handled by the main glass container overlay */}
 
               {!isCameraReady && !cameraError && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950">
