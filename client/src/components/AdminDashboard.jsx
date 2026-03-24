@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { Search, Filter, Download, Users, CheckCircle, Clock, AlertCircle, Shield, LogOut, ChevronRight, UserPlus, Settings, Database, RotateCcw, Trash2, Fingerprint, X, History, Loader2, MapPin, UserCheck, LayoutDashboard, Calendar } from 'lucide-react';
+import { Search, Filter, Download, Users, CheckCircle, Clock, AlertCircle, Shield, LogOut, ChevronRight, UserPlus, Settings, Database, RotateCcw, Trash2, Fingerprint, X, History, Loader, MapPin, UserCheck, LayoutDashboard, Calendar } from 'lucide-react';
 import AttendanceHistory from './AttendanceHistory';
 import { BRANCHES, SECTIONS } from '../constants';
 
@@ -829,7 +829,7 @@ const AdminDashboard = () => {
                   <span className="text-slate-400 font-bold text-xs">to</span>
                   <input type="date" className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold font-mono" value={matrixRange.end} onChange={e => setMatrixRange({...matrixRange, end: e.target.value})} />
                   <button onClick={fetchMatrix} disabled={matrixLoading} className="p-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50">
-                    {matrixLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    {matrixLoading ? <Loader className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
@@ -850,7 +850,7 @@ const AdminDashboard = () => {
                         {new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
                       </th>
                     ))}
-                    <th className="sticky right-[80px] z-50 bg-slate-50 px-4 py-4 text-[10px] font-black text-primary-600 uppercase tracking-widest border-l border-slate-200 shadow-[-5px_0_5px_-5px_rgba(0,0,0,0.1)] min-w-[70px] w-[70px]">Total</th>
+                    <th className="sticky right-[80px] z-50 bg-slate-50 px-4 py-4 text-[10px] font-black text-primary-600 uppercase tracking-widest border-l border-slate-200 shadow-md min-w-[70px] w-[70px]">Total</th>
                     <th className="sticky right-0 z-50 bg-slate-50 px-4 py-4 text-[10px] font-black text-green-600 uppercase tracking-widest border-l border-slate-200 min-w-[80px] w-[80px]">Present</th>
                   </tr>
                 </thead>
@@ -875,7 +875,7 @@ const AdminDashboard = () => {
                                 </td>
                               );
                             })}
-                            <td className="sticky right-[80px] z-30 bg-white px-4 py-3 text-[10px] font-black text-primary-600 border-l border-slate-50 text-center shadow-[-5px_0_5px_-5px_rgba(0,0,0,0.1)]">
+                            <td className="sticky right-[80px] z-30 bg-white px-4 py-3 text-[10px] font-black text-primary-600 border-l border-slate-50 text-center shadow-md">
                               {matrixData.dates.length}
                             </td>
                             <td className="sticky right-0 z-30 bg-white px-4 py-3 text-[10px] font-black text-green-600 border-l border-slate-50 text-center">
@@ -894,7 +894,7 @@ const AdminDashboard = () => {
               <table className="w-full text-left table-fixed border-separate border-spacing-0">
                 <tbody className="divide-y divide-slate-100">
                   {loading && students.length === 0 ? (
-                    <tr><td colSpan="6" className="py-20 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-primary-600" /></td></tr>
+                    <tr><td colSpan="6" className="py-20 text-center"><Loader className="w-8 h-8 animate-spin mx-auto text-primary-600" /></td></tr>
                   ) : students.length === 0 ? (
                     <tr><td colSpan="6" className="py-20 text-center text-slate-400 italic">No students found.</td></tr>
                   ) : (
@@ -1062,7 +1062,6 @@ const AdminDashboard = () => {
           </div>
         )}
       </div>
-    </div>
   </div>
 
   {/* Add Student Modal */}
@@ -1157,7 +1156,7 @@ const AdminDashboard = () => {
               disabled={addLoading}
               className="w-full py-4 bg-primary-600 text-white font-bold rounded-2xl shadow-xl shadow-primary-100 hover:bg-primary-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {addLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus className="w-5 h-5" />}
+              {addLoading ? <Loader className="w-5 h-5 animate-spin" /> : <UserPlus className="w-5 h-5" />}
               <span>{addLoading ? 'Adding Student...' : 'Register Student'}</span>
             </button>
             <p className="text-[10px] text-slate-400 text-center uppercase tracking-widest font-bold">
