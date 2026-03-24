@@ -65,12 +65,20 @@ const StudentDashboard = ({ user }) => {
     try {
       const response = await axios.get('/attendance/session');
       console.log('Session response:', response.data);
-      setSession(response.data);
+      setSession({ ...response.data, error: false, isExpired: false });
     } catch (err) {
       console.error('Failed to fetch session', err);
+      const isAuthError = err.response?.status === 401 || err.response?.status === 403;
       const statusCode = err.response?.status ? `[${err.response.status}] ` : '';
       const msg = err.response?.data?.error || err.response?.data?.message || err.message || 'Sync Error';
-      setSession({ is_open: false, expires_at: null, error: true, errorMessage: `${statusCode}${msg}` });
+      
+      setSession({ 
+        is_open: false, 
+        expires_at: null, 
+        error: true, 
+        isExpired: isAuthError,
+        errorMessage: isAuthError ? 'Your session has expired. Please log out and back in.' : `${statusCode}${msg}` 
+      });
     } finally {
       setIsSessionLoading(false);
     }
@@ -291,15 +299,25 @@ const StudentDashboard = ({ user }) => {
                <div className="text-[10px] font-bold text-slate-300 uppercase">v2.4.1</div>
              </div>
            )}
-           {session.error && (
-             <div className="px-4 py-2 bg-red-50 rounded-xl border border-red-200 flex flex-col items-center gap-1">
-                <div className="flex items-center gap-2">
-                   <XCircle className="w-3 h-3 text-red-500" />
-                   <span className="text-[10px] font-black text-red-600 uppercase">Sync Error</span>
-                </div>
-                <p className="text-[8px] text-red-400 font-bold">{session.errorMessage}</p>
-             </div>
-           )}
+            {session.error && (
+              <div className="px-4 py-2 bg-red-50 rounded-xl border border-red-200 flex flex-col items-center gap-1">
+                 <div className="flex items-center gap-2">
+                    <XCircle className="w-3 h-3 text-red-500" />
+                    <span className="text-[10px] font-black text-red-600 uppercase">
+                      {session.isExpired ? 'Session Expired' : 'Sync Error'}
+                    </span>
+                 </div>
+                 <p className="text-[8px] text-red-400 font-bold mb-1">{session.errorMessage}</p>
+                 {session.isExpired && (
+                   <button 
+                     onClick={() => navigate('/login')}
+                     className="mt-1 px-3 py-1 bg-red-600 text-white text-[9px] font-black rounded-lg hover:bg-red-700 transition-all uppercase tracking-widest"
+                   >
+                     Log In Again
+                   </button>
+                 )}
+              </div>
+            )}
          </div>
 
          <div className="glass p-8 rounded-[2.5rem] shadow-2xl flex flex-col items-center gap-8 min-h-[600px] border border-white/50 relative overflow-hidden">
