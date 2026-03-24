@@ -15,10 +15,14 @@ const initDB = async () => {
       CREATE TABLE IF NOT EXISTS portal_settings (
         id SERIAL PRIMARY KEY,
         is_open BOOLEAN DEFAULT FALSE,
+        session_starts_at TIMESTAMP WITH TIME ZONE,
         expires_at TIMESTAMP WITH TIME ZONE,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    
+    // Ensure existing databases are updated
+    await pool.query("ALTER TABLE portal_settings ADD COLUMN IF NOT EXISTS session_starts_at TIMESTAMP WITH TIME ZONE");
     
     // Ensure we have exactly one settings record
     const result = await pool.query("SELECT COUNT(*) FROM portal_settings WHERE id = 1");
