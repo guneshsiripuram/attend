@@ -110,16 +110,20 @@ const StudentDashboard = ({ user }) => {
     setBlinkDetected(false);
     setResult(null);
 
-    // 1. Liveness Step: Blink Detection
-    let blinkFound = false;
+    // 1. Liveness Step: Sequence-Based Blink Detection
+    const framesForLiveness = [];
     const startLiveness = Date.now();
     
     const livenessInterval = setInterval(async () => {
       const frame = webcamRef.current.getScreenshot();
       if (frame) {
-        const detection = await FaceService.getDescriptorFromBase64(frame);
-        if (FaceService.detectBlink(detection)) {
-          blinkFound = true;
+        const analysis = await FaceService.analyzeBase64(frame);
+        framesForLiveness.push(analysis);
+        
+        // Keep only last 10 frames for sliding window
+        if (framesForLiveness.length > 10) framesForLiveness.shift();
+
+        if (FaceService.detectBlinkSequence(framesForLiveness)) {
           setBlinkDetected(true);
           setLivenessStatus('success');
           clearInterval(livenessInterval);
@@ -127,32 +131,42 @@ const StudentDashboard = ({ user }) => {
         }
       }
       
-      // Timeout liveness after 10 seconds
-      if (Date.now() - startLiveness > 10000 && !blinkFound) {
+      // Timeout liveness after 12 seconds
+      if (Date.now() - startLiveness > 12000) {
         clearInterval(livenessInterval);
-        setLivenessStatus('failed');
-        setResult({ success: false, message: 'Liveness failed: No blink detected. Please try again.' });
-        setIsVerifying(false);
+        if (livenessStatus !== 'success') {
+          setLivenessStatus('failed');
+          setResult({ 
+            success: false, 
+            message: 'Liveness failed: No clear blink sequence detected. Please blink naturally and ensure good lighting.' 
+          });
+          setIsVerifying(false);
+        }
       }
-    }, 200);
+    }, 250); // 4 FPS for liveness tracking
   };
 
   const performBurstCapture = async () => {
-    // 2. Burst Capture: Take 5 frames quickly
+    // 2. Burst Capture: Take 5 high-quality frames
     const burstDescriptors = [];
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 8; i++) { // Take 8, pick best 5
       const frame = webcamRef.current.getScreenshot();
       if (frame) {
-        const detection = await FaceService.getDescriptorFromBase64(frame);
-        if (detection && FaceService.getFaceQuality(detection).isGood) {
-          burstDescriptors.push(Array.from(detection.descriptor));
+        const analysis = await FaceService.analyzeBase64(frame);
+        if (analysis.isGood) {
+          burstDescriptors.push(analysis.descriptor);
         }
       }
-      await new Promise(r => setTimeout(r, 200));
+      if (burstDescriptors.length >= 5) break;
+      await new Promise(r => setTimeout(r, 150));
     }
 
-    if (burstDescriptors.length === 0) {
-      setResult({ success: false, message: 'Could not capture high-quality face samples. Adjust lighting.' });
+    if (burstDescriptors.length < 3) {
+      setResult({ 
+        success: false, 
+        message: 'Could not capture enough high-quality face samples. Please stay still and ensure your face is well-lit.',
+        details: 'Quality gates rejected too many frames.'
+      });
       setIsVerifying(false);
       setLivenessStatus('idle');
       return;
@@ -164,7 +178,7 @@ const StudentDashboard = ({ user }) => {
         try {
           const loc = { lat: position.coords.latitude, lng: position.coords.longitude };
           const response = await axios.post('/attendance/verify', {
-            face_descriptor: burstDescriptors, // Send burst array
+            face_descriptor: burstDescriptors,
             location: loc
           });
           setResult({ success: true, message: response.data.message });
@@ -173,7 +187,8 @@ const StudentDashboard = ({ user }) => {
         } catch (err) {
           setResult({ 
             success: false, 
-            message: err.response?.data?.message || 'Verification failed. Try again.' 
+            message: err.response?.data?.message || 'Verification failed. Try again.',
+            details: err.response?.data?.details
           });
           setLivenessStatus('idle');
         } finally {
@@ -181,7 +196,7 @@ const StudentDashboard = ({ user }) => {
         }
       },
       (err) => {
-        setResult({ success: false, message: 'Location access denied.' });
+        setResult({ success: false, message: 'Location access denied. Attendance requires GPS.' });
         setIsVerifying(false);
         setLivenessStatus('idle');
       },

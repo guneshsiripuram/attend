@@ -58,28 +58,27 @@ const Register = () => {
       const frame = webcamRef.current.getScreenshot();
       if (frame) {
         try {
-          const detection = await FaceService.getDescriptorFromBase64(frame);
-          const quality = FaceService.getFaceQuality(detection);
+          const analysis = await FaceService.analyzeBase64(frame);
           
-          if (!quality.isGood) {
-            setError(`Step ${enrollmentStep + 1} Failed: ${quality.reason}. Please try again.`);
+          if (!analysis.isGood) {
+            setError(`Step ${enrollmentStep + 1} Failed: ${analysis.reason}. Please ensure you are centered and close enough.`);
             setIsRecording(false);
             return;
           }
           
           setEnrolledSamples(prev => {
             const next = [...prev];
-            next[enrollmentStep] = Array.from(detection.descriptor);
+            next[enrollmentStep] = analysis.descriptor;
             return next;
           });
           
           if (enrollmentStep < 2) {
             setEnrollmentStep(prev => prev + 1);
           } else {
-            setSuccess('All poses captured successfully!');
+            setSuccess('All poses captured successfully with high quality!');
           }
         } catch (err) {
-          setError('Face detection failed. Ensure good lighting.');
+          setError('Face analysis failed. Ensure good lighting and try again.');
         }
       }
       setIsRecording(false);
