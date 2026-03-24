@@ -519,69 +519,69 @@ const AdminDashboard = () => {
                       
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div className="relative">
-                        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <select 
-                          className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-xs w-full appearance-none cursor-pointer"
-                          value={filters.branch}
-                          onChange={(e) => setFilters({...filters, branch: e.target.value})}
-                        >
-                          <option value="">All Branches</option>
-                          <option value="CSE">CSE (Computer Science)</option>
-                          <option value="ECE">ECE (Electronics)</option>
-                          <option value="EEE">EEE (Electrical)</option>
-                          <option value="MECH">MECH (Mechanical)</option>
-                          <option value="CIVIL">CIVIL (Civil)</option>
-                          <option value="AI&ML">AI & ML</option>
-                          <option value="IT">IT (Information Tech)</option>
-                        </select>
-                      </div>
-                      <div className="relative">
-                        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <select 
-                          className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-xs w-full appearance-none cursor-pointer"
-                          value={filters.section}
-                          onChange={(e) => setFilters({...filters, section: e.target.value})}
-                        >
-                          <option value="">All Sections</option>
-                          <option value="A">Section A</option>
-                          <option value="B">Section B</option>
-                          <option value="C">Section C</option>
-                          <option value="D">Section D</option>
-                        </select>
-                      </div>
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                        <input 
-                          type="text" 
-                          placeholder="Search Roll Number" 
-                          className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-xs w-full"
-                          value={filters.rollNumber}
-                          onChange={(e) => setFilters({...filters, rollNumber: e.target.value})}
-                        />
-                      </div>
-                   </div>
+                          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <select 
+                            className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-xs w-full appearance-none cursor-pointer"
+                            value={filters.branch}
+                            onChange={(e) => setFilters({...filters, branch: e.target.value})}
+                          >
+                            <option value="">All Branches</option>
+                            <option value="CSE">CSE (Computer Science)</option>
+                            <option value="ECE">ECE (Electronics)</option>
+                            <option value="EEE">EEE (Electrical)</option>
+                            <option value="MECH">MECH (Mechanical)</option>
+                            <option value="CIVIL">CIVIL (Civil)</option>
+                            <option value="AI&ML">AI & ML</option>
+                            <option value="IT">IT (Information Tech)</option>
+                          </select>
+                        </div>
+                        <div className="relative">
+                          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <select 
+                            className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-xs w-full appearance-none cursor-pointer"
+                            value={filters.section}
+                            onChange={(e) => setFilters({...filters, section: e.target.value})}
+                          >
+                            <option value="">All Sections</option>
+                            <option value="A">Section A</option>
+                            <option value="B">Section B</option>
+                            <option value="C">Section C</option>
+                            <option value="D">Section D</option>
+                          </select>
+                        </div>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <input 
+                            type="text" 
+                            placeholder="Search Roll Number" 
+                            className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none text-xs w-full"
+                            value={filters.rollNumber}
+                            onChange={(e) => setFilters({...filters, rollNumber: e.target.value})}
+                          />
+                        </div>
+                    </div>
                 </div>
-             </div>
-             
-             {/* TABLE HEADERS - FIXED POSITION BELOW SEARCH */}
-             {(activeTab === 'attendance' || activeTab === 'roster') && (
-               <div className="max-w-6xl mx-auto mt-4 px-2">
-                  <table className="w-full text-left table-fixed">
-                     <thead>
-                       <tr>
-                         <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[5%]">S.No</th>
-                         <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[30%]">Student Details</th>
-                         <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[15%]">Roll/Sec</th>
-                         <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[20%]">{activeTab === 'roster' ? 'Last Attempt' : 'Timestamp'}</th>
-                         <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[15%] text-center">Live Status</th>
-                         <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[15%] text-right">Actions</th>
-                       </tr>
-                     </thead>
-                  </table>
-               </div>
-             )}
-          </div>
-       )}
+              </div>
+
+              {/* TABLE HEADERS - FIXED POSITION BELOW SEARCH */}
+              {(activeTab === 'attendance' || activeTab === 'roster') && (
+                <div className="max-w-6xl mx-auto mt-4 px-2">
+                   <table className="w-full text-left table-fixed">
+                      <thead>
+                        <tr>
+                          <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[5%]">S.No</th>
+                          <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[30%]">Student Details</th>
+                          <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[15%]">Roll/Sec</th>
+                          <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[20%]">{activeTab === 'roster' ? 'Last Attempt' : 'Timestamp'}</th>
+                          <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[15%] text-center">Live Status</th>
+                          <th className="py-2 px-4 font-bold text-slate-400 text-[10px] uppercase tracking-wider w-[15%] text-right">Actions</th>
+                        </tr>
+                      </thead>
+                   </table>
+                </div>
+              )}
+           </div>
+        )}
 
         {/* STUDENT REGISTRY CONTROLS */}
         {activeTab === 'students' && (
@@ -660,6 +660,7 @@ const AdminDashboard = () => {
           </div>
        )}
     </div>
+
 
     {/* Scrollable Logs Section - ONLY ROWS SCROLL NOW */}
     <div className="flex-1 overflow-y-auto px-8 pb-8 custom-scrollbar bg-slate-50/30">
@@ -855,37 +856,37 @@ const AdminDashboard = () => {
                     <th className="sticky right-0 z-50 bg-slate-50 px-4 py-4 text-[10px] font-black text-green-600 uppercase tracking-widest border-l border-slate-200 min-w-[80px] w-[80px]">Present</th>
                   </tr>
                 </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
-                      {matrixData.rows.map((row, idx) => {
-                        const presentCount = matrixData.dates.filter(d => row.attendance[d] === 'P' || row.attendance[d] === 'M').length;
-                        return (
-                          <tr key={row.roll} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="sticky left-0 z-30 bg-white px-4 py-3 text-xs font-bold text-slate-400 border-r border-slate-50">{idx + 1}</td>
-                            <td className="sticky left-[50px] z-30 bg-white px-4 py-3 text-[10px] font-black text-slate-900 border-r border-slate-50 uppercase">{row.roll}</td>
-                            <td className="sticky left-[160px] z-30 bg-white px-6 py-3 text-xs font-black text-slate-700 border-r border-slate-100 truncate max-w-[200px]">{row.name}</td>
-                            {matrixData.dates.map(date => {
-                              const status = row.attendance[date];
-                              const displayStatus = status === 'M' ? 'P' : (status || '-');
-                              return (
-                                <td key={date} className={`px-2 py-3 text-center border-r border-slate-50 text-[10px] font-black ${
-                                  displayStatus === 'P' ? 'text-green-600 bg-green-50/20' : 
-                                  displayStatus === 'A' ? 'text-red-500 bg-red-50/20' : 
-                                  'text-slate-300'
-                                }`}>
-                                  {displayStatus}
-                                </td>
-                              );
-                            })}
-                            <td className="sticky right-[80px] z-30 bg-white px-4 py-3 text-[10px] font-black text-primary-600 border-l border-slate-50 text-center shadow-md">
-                              {matrixData.dates.length}
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {matrixData.rows.map((row) => {
+                    const presentCount = matrixData.dates.filter(d => row.attendance[d] === 'P' || row.attendance[d] === 'M').length;
+                    return (
+                      <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="sticky left-0 z-30 bg-white px-4 py-3 text-xs font-bold text-slate-400 border-r border-slate-50">{row.sn}</td>
+                        <td className="sticky left-[50px] z-30 bg-white px-4 py-3 text-[10px] font-black text-slate-900 border-r border-slate-50 uppercase">{row.roll}</td>
+                        <td className="sticky left-[160px] z-30 bg-white px-6 py-3 text-xs font-black text-slate-700 border-r border-slate-100 truncate max-w-[200px]">{row.name}</td>
+                        {matrixData.dates.map(date => {
+                          const status = row.attendance[date] || '-';
+                          const displayStatus = status === 'M' ? 'P' : status;
+                          return (
+                            <td key={date} className={`px-2 py-3 text-center border-r border-slate-50 text-[10px] font-black ${
+                              displayStatus === 'P' ? 'text-green-600 bg-green-50/20' : 
+                              displayStatus === 'A' ? 'text-red-500 bg-red-50/20' : 
+                              'text-slate-300'
+                            }`}>
+                              {displayStatus}
                             </td>
-                            <td className="sticky right-0 z-30 bg-white px-4 py-3 text-[10px] font-black text-green-600 border-l border-slate-50 text-center">
-                              {presentCount}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
+                          );
+                        })}
+                        <td className="sticky right-[80px] z-30 bg-white px-4 py-3 text-[10px] font-black text-primary-600 border-l border-slate-50 text-center shadow-md">
+                          {matrixData.dates.length}
+                        </td>
+                        <td className="sticky right-0 z-30 bg-white px-4 py-3 text-[10px] font-black text-green-600 border-l border-slate-50 text-center">
+                          {presentCount}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
               </table>
             </div>
           </div>
@@ -895,9 +896,9 @@ const AdminDashboard = () => {
               <table className="w-full text-left table-fixed border-separate border-spacing-0">
                 <tbody className="divide-y divide-slate-100">
                   {loading && students.length === 0 ? (
-                    <tr><td colSpan="6" className="py-20 text-center"><Loader className="w-8 h-8 animate-spin mx-auto text-primary-600" /></td></tr>
+                    <tr><td colSpan="6" className="py-20 text-center"><Loader className="w-8 h-8 animate-spin mx-auto text-primary-600" /><span>Loading Registry...</span></td></tr>
                   ) : students.length === 0 ? (
-                    <tr><td colSpan="6" className="py-20 text-center text-slate-400 italic">No students found.</td></tr>
+                    <tr><td colSpan="6" className="py-20 text-center text-slate-400 italic font-medium">No students found.</td></tr>
                   ) : (
                     students.map((student, index) => (
                       <tr key={student.id} className="hover:bg-slate-50/50 transition-colors group">
@@ -914,21 +915,48 @@ const AdminDashboard = () => {
                           </div>
                         </td>
                         <td className="py-4 px-6 w-[15%]">
-                          <span className="font-mono text-[9px] font-bold text-slate-700">{student.roll_number} ({student.section})</span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-mono text-[9px] font-bold text-slate-700">
+                              {student.roll_number}
+                            </span>
+                            <span className="text-[9px] text-slate-400">
+                              Sec: {student.section}
+                            </span>
+                          </div>
                         </td>
                         <td className="py-4 px-6 w-[15%]">
                           {student.has_face_data ? (
-                            <span className="text-[9px] font-bold text-green-600 flex items-center gap-1"><Fingerprint className="w-3 h-3" />Enrolled</span>
+                            <div className="flex items-center gap-1.5 text-green-600">
+                              <Fingerprint className="w-3 h-3" />
+                              <span className="text-[9px] font-bold">Enrolled</span>
+                            </div>
                           ) : (
-                            <span className="text-[9px] font-bold text-amber-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />Pending</span>
+                            <div className="flex items-center gap-1.5 text-amber-500">
+                              <AlertCircle className="w-3 h-3" />
+                              <span className="text-[9px] font-bold">Pending</span>
+                            </div>
                           )}
                         </td>
-                        <td className="py-4 px-6 w-[20%] truncate text-[10px] text-slate-500">{student.college_email}</td>
+                        <td className="py-4 px-6 w-[20%] overflow-hidden">
+                           <span className="text-[10px] text-slate-500 truncate block">{student.college_email}</span>
+                        </td>
                         <td className="py-4 px-6 w-[15%] text-right">
-                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                            <button onClick={() => handleResetFace(student.id)} className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg"><RotateCcw className="w-4 h-4" /></button>
-                            <button onClick={() => handleDeleteStudent(student.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
-                          </div>
+                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                <button 
+                                  onClick={() => handleResetFace(student.id)}
+                                  title="Reset Face Data"
+                                  className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                                >
+                                    <RotateCcw className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteStudent(student.id)}
+                                  title="Remove Student"
+                                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
                         </td>
                       </tr>
                     ))

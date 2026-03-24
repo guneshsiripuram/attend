@@ -79,7 +79,7 @@ const StudentDashboard = ({ user }) => {
   React.useEffect(() => {
     FaceService.loadModels().then(() => setIsModelsLoaded(true));
     checkSession();
-    const interval = setInterval(checkSession, 10000);
+    const interval = setInterval(checkSession, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -278,6 +278,17 @@ const StudentDashboard = ({ user }) => {
                   <span className="text-[10px] font-black text-green-600 uppercase">Live</span>
                </div>
                <p className="text-[9px] text-green-400 font-bold">Synced just now</p>
+             </div>
+           )}
+           {isTrulyOpen && (
+             <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-100">
+               <div className="flex items-center gap-2">
+                 <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                   Synced {session.server_time ? `@ ${new Date(session.server_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : 'just now'}
+                 </span>
+               </div>
+               <div className="text-[10px] font-bold text-slate-300 uppercase">v2.4.1</div>
              </div>
            )}
            {session.error && (
