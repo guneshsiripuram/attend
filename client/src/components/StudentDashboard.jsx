@@ -184,6 +184,7 @@ const StudentDashboard = ({ user }) => {
           setResult({ success: true, message: response.data.message });
           setLivenessStatus('idle');
           fetchHistory();
+          checkSession(); // PROACTIVE REFRESH: Sync gate state immediately after success
         } catch (err) {
           setResult({ 
             success: false, 
@@ -206,13 +207,13 @@ const StudentDashboard = ({ user }) => {
 
   // Adaptive Auto-Verify Loop
   React.useEffect(() => {
-    if (isAutoMode && !result?.success && !isVerifying && session.is_open) {
+    if (isAutoMode && !result?.success && !isVerifying && isTrulyOpen) {
       autoVerifyTimeout.current = setTimeout(() => {
         handleVerify();
       }, 1500);
     }
     return () => clearTimeout(autoVerifyTimeout.current);
-  }, [isAutoMode, result, isVerifying, session.is_open]);
+  }, [isAutoMode, result, isVerifying, isTrulyOpen]);
 
   const chartData = [
     { name: 'Present', value: stats.present },
@@ -396,7 +397,7 @@ const StudentDashboard = ({ user }) => {
             <div className="text-center">
               <h1 className="text-3xl font-black text-slate-900 tracking-tight">AI Identity Verification</h1>
               <div className="mt-4 flex flex-col items-center gap-2">
-                {isAutoMode && !result?.success && session.is_open ? (
+                {isAutoMode && !result?.success && isTrulyOpen ? (
                   <p className="text-primary-600 font-black animate-pulse flex items-center justify-center gap-3 uppercase tracking-widest text-xs h-6">
                     <span className="flex gap-1">
                        <span className="w-1 h-1 bg-primary-600 rounded-full animate-bounce"></span>
@@ -525,9 +526,9 @@ const StudentDashboard = ({ user }) => {
    
              <button
                onClick={() => handleVerify()}
-               disabled={isVerifying || result?.success || !session.is_open}
+               disabled={isVerifying || result?.success || !isTrulyOpen}
                className={`w-full py-5 rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-2xl flex items-center justify-center gap-4 transition-all transform active:scale-95 ${
-                 isVerifying || result?.success || !session.is_open
+                 isVerifying || result?.success || !isTrulyOpen
                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none' 
                  : 'bg-primary-600 hover:bg-primary-700 text-white shadow-primary-200 hover:shadow-primary-300/50'
                }`}
