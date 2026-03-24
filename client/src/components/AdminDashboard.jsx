@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { Search, Filter, Download, Users, CheckCircle, Clock, AlertCircle, Shield, LogOut, ChevronRight, UserPlus, Settings, Database, RotateCcw, Trash2, Fingerprint, X, History, Loader, MapPin, UserCheck, LayoutDashboard, Calendar } from 'lucide-react';
-import AttendanceHistory from './AttendanceHistory';
 import { BRANCHES, SECTIONS } from '../constants';
 
 const AdminDashboard = () => {
@@ -200,10 +199,7 @@ const AdminDashboard = () => {
     } else if (activeTab === 'roster') {
       exportData = rosterData;
       filename = `Live_Roster_${filters.date || 'Export'}.csv`;
-    } else if (activeTab === 'history') {
-      alert('Please use the "Download" button inside the Daily History section to export historical records.');
-      return;
-    }
+
 
     if (!exportData || exportData.length === 0) {
       alert('No data to export for current view');
@@ -311,7 +307,7 @@ const AdminDashboard = () => {
     { id: 'roster', label: 'Class Roster', icon: Users },
     { id: 'attendance', label: 'Live Logs', icon: LayoutDashboard },
     { id: 'matrix', label: 'Master Matrix', icon: Filter },
-    { id: 'history', label: 'Daily History', icon: Calendar },
+
     { id: 'students', label: 'Manage Students', icon: Users },
     { id: 'system', label: 'System Health', icon: Database },
     { id: 'settings', label: 'Portal Settings', icon: Settings },
@@ -819,8 +815,7 @@ const AdminDashboard = () => {
               </table>
             </div>
           </div>
-        ) : activeTab === 'history' ? (
-          <AttendanceHistory />
+
         ) : activeTab === 'matrix' ? (
           <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col h-[600px]">
             <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-white sticky top-0 z-10">
