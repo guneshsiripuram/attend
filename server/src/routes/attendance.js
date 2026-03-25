@@ -62,8 +62,8 @@ router.post('/verify', authMiddleware, async (req, res) => {
     const existingLog = await query(
       `SELECT id FROM attendance_logs 
        WHERE user_id = $1 AND status = 'Present' 
-       AND ("timestamp" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date 
-       AND (CASE WHEN EXTRACT(HOUR FROM "timestamp" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata') < 12 THEN 'Morning' ELSE 'Afternoon' END) = $2`,
+       AND (timestamp AT TIME ZONE 'Asia/Kolkata')::date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date 
+       AND (CASE WHEN EXTRACT(HOUR FROM timestamp AT TIME ZONE 'Asia/Kolkata') < 12 THEN 'Morning' ELSE 'Afternoon' END) = $2`,
       [userId, currentSession]
     );
 

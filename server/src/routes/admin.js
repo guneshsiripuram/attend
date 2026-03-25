@@ -11,7 +11,10 @@ router.get('/attendance/all', authMiddleware, adminMiddleware, async (req, res) 
   const { name, email, date, branch, section, rollNumber } = req.query;
   
   let q = `
-    SELECT al.id, al.timestamp, al.status, u.full_name, u.college_email, u.roll_number, u.section, u.branch
+    SELECT MAX(al.id) as id, MAX(al.timestamp) as timestamp, MAX(al.status) as status, 
+           u.full_name, u.college_email, u.roll_number, u.section, u.branch,
+           (al.timestamp AT TIME ZONE 'Asia/Kolkata')::date as log_date,
+           (CASE WHEN EXTRACT(HOUR FROM al.timestamp AT TIME ZONE 'Asia/Kolkata') < 12 THEN 'Morning' ELSE 'Afternoon' END) as session
     FROM attendance_logs al
     JOIN users u ON al.user_id = u.id
     WHERE al.status = 'Present'
@@ -48,7 +51,8 @@ router.get('/attendance/all', authMiddleware, adminMiddleware, async (req, res) 
     q += ` AND al.timestamp >= $${params.length - 1} AND al.timestamp < $${params.length}`;
   }
 
-  q += ` ORDER BY al.timestamp DESC`;
+  q += ` GROUP BY u.id, u.full_name, u.college_email, u.roll_number, u.section, u.branch, log_date, session`;
+  q += ` ORDER BY timestamp DESC`;
 
   try {
     const result = await query(q, params);
@@ -56,7 +60,7 @@ router.get('/attendance/all', authMiddleware, adminMiddleware, async (req, res) 
     // Summary data
     const summaryResult = await query(`
       SELECT 
-        COUNT(*) FILTER (WHERE status = 'Present') as presentToday,
+        COUNT(DISTINCT user_id) FILTER (WHERE status = 'Present') as presentToday,
         COUNT(DISTINCT user_id) as totalStudents
       FROM attendance_logs
       WHERE timestamp::date = CURRENT_DATE
