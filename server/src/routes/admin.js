@@ -305,10 +305,14 @@ router.post('/session/toggle', authMiddleware, adminMiddleware, async (req, res)
     });
   } catch (error) {
     console.error('--- SESSION_TOGGLE_ERROR ---');
-    console.error('Error details:', error.message);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Stack:', error.stack);
+    
     res.status(500).json({ 
       message: 'Error toggling session',
-      error: error.message 
+      error: error.message,
+      details: error.stack ? 'Check server logs for detailed trace' : 'Internal Server Error'
     });
   }
 });
