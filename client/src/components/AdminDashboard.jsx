@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { Search, Filter, Download, Users, CheckCircle, Clock, AlertCircle, Shield, LogOut, ChevronRight, UserPlus, Settings, Database, RotateCcw, Trash2, Fingerprint, X, History, Loader, MapPin, UserCheck, LayoutDashboard, Calendar } from 'lucide-react';
+import AttendanceHistory from './AttendanceHistory';
 import { BRANCHES, SECTIONS } from '../constants';
 
 const AdminDashboard = () => {
@@ -124,7 +125,7 @@ const AdminDashboard = () => {
         is_open: !session.is_open, 
         starts_at: resp.data.startsAt, 
         expires_at: resp.data.expiresAt, 
-        server_time: resp.data.serverTime 
+        server_time: resp.data.serverTime || new Date() 
       });
       if (startTime) {
         setScheduleStart('');
@@ -319,7 +320,6 @@ const AdminDashboard = () => {
   ];
 
   return (
-    <>
     <div className="flex h-[calc(100vh-100px)] -mt-8 -mx-4 overflow-hidden">
       {/* Sidebar */}
       <div className="w-64 bg-slate-900 text-white p-6 hidden md:flex flex-col gap-8 h-full flex-shrink-0 z-20">
@@ -687,11 +687,7 @@ const AdminDashboard = () => {
             </div>
           </div>
         ) : activeTab === 'history' ? (
-          <div className="flex-1 overflow-y-auto px-8 pb-8 custom-scrollbar bg-slate-50/30">
-            <div className="my-8">
-              <DailyHistory />
-            </div>
-          </div>
+          <AttendanceHistory />
         ) : activeTab === 'students' ? (
             <div className="flex-1 overflow-y-auto px-8 pb-8 custom-scrollbar bg-slate-50/30">
             {/* Student Roster Filters */}
@@ -826,6 +822,114 @@ const AdminDashboard = () => {
               </div>
             </div>
           </div>
+        ) : activeTab === 'settings' ? (
+          <div className="bg-white p-8 md:p-12 rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 max-w-4xl mx-auto animate-in zoom-in-95 duration-500">
+             <div className="flex flex-col md:flex-row items-center gap-12">
+                <div className="flex-1 space-y-6">
+                   <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary-50 text-primary-600 rounded-2xl font-black text-xs uppercase tracking-widest border border-primary-100">
+                      <Shield className="w-4 h-4" />
+                      Security Gate Control
+                   </div>
+                   <h2 className="text-4xl font-black text-slate-900 leading-tight">
+                      Manage Attendance <span className="text-primary-600">Access</span>
+                   </h2>
+                   <p className="text-slate-500 text-lg leading-relaxed">
+                      Control exactly when students can mark their attendance. Opening the "Gate" allows AI verification to proceed.
+                   </p>
+                   
+                   <div className="pt-6 space-y-4">
+                      {session.is_open ? (
+                        <div className="space-y-6">
+                           <div className={`p-6 border-2 rounded-3xl flex items-center justify-between ${session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? 'bg-amber-50 border-amber-100' : 'bg-green-50 border-green-100 animate-pulse'}`}>
+                              <div className="flex items-center gap-4">
+                                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg ${session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? 'bg-amber-500 shadow-amber-200' : 'bg-green-500 shadow-green-200'}`}>
+                                    <Clock className="w-6 h-6 text-white" />
+                                 </div>
+                                 <div>
+                                    <p className={`font-black text-lg ${session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? 'text-amber-800' : 'text-green-800'}`}>
+                                      {session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? 'GATE SCHEDULED' : 'GATE IS OPEN'}
+                                    </p>
+                                    <p className={`text-sm font-bold ${session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? 'text-amber-600' : 'text-green-600'}`}>
+                                      {session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? `Opens at ${new Date(session.starts_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'Students can now mark attendance'}
+                                    </p>
+                                 </div>
+                              </div>
+                              {session.expires_at && (
+                                <div className="text-right">
+                                   <p className={`text-xs font-bold uppercase ${session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? 'text-amber-700' : 'text-green-700'}`}>Closes at</p>
+                                   <p className={`text-xl font-black ${session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? 'text-amber-800' : 'text-green-800'}`}>{new Date(session.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                </div>
+                              )}
+                           </div>
+                           <button 
+                             onClick={() => handleToggleSession(null)}
+                             disabled={sessionLoading}
+                             className={`w-full py-5 text-white font-black rounded-3xl shadow-xl transition-all transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3 ${session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? 'bg-slate-800 hover:bg-slate-900 shadow-slate-200' : 'bg-red-500 hover:bg-red-600 shadow-red-100'}`}
+                           >
+                             <LogOut className="w-6 h-6 rotate-180" />
+                             {session.starts_at && new Date(session.starts_at) > (session.server_time ? new Date(session.server_time) : new Date()) ? 'CANCEL SCHEDULE' : 'FORCE CLOSE GATE NOW'}
+                           </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-6">
+                           <div className="p-6 bg-slate-50 border border-slate-200 rounded-3xl flex items-center gap-4">
+                              <div className="w-12 h-12 bg-slate-200 rounded-2xl flex items-center justify-center">
+                                 <Shield className="w-6 h-6 text-slate-500" />
+                              </div>
+                              <div>
+                                 <p className="text-slate-800 font-black text-lg uppercase tracking-tight">Gate is Closed</p>
+                                 <p className="text-slate-400 text-sm font-medium">Select a duration or schedule a time</p>
+                              </div>
+                           </div>
+                           
+                           <div className="grid grid-cols-3 gap-4">
+                              {[10, 20, 30].map(mins => (
+                                <button
+                                  key={mins}
+                                  onClick={() => handleToggleSession(mins)}
+                                  disabled={sessionLoading}
+                                  className="flex flex-col items-center gap-2 p-6 bg-white border-2 border-slate-100 rounded-[2rem] hover:border-primary-500 hover:bg-primary-50 transition-all group shadow-sm hover:shadow-xl hover:shadow-primary-100/50"
+                                >
+                                   <div className="w-12 h-12 bg-slate-50 group-hover:bg-primary-500 rounded-2xl flex items-center justify-center transition-colors">
+                                      <Clock className="w-6 h-6 text-slate-400 group-hover:text-white" />
+                                   </div>
+                                   <span className="font-black text-slate-400 group-hover:text-primary-700">{mins} MINS</span>
+                                </button>
+                              ))}
+                           </div>
+
+                           <div className="p-5 bg-white border border-slate-200 rounded-[2rem] shadow-sm mt-2">
+                             <p className="text-slate-800 font-bold mb-4 flex items-center gap-2 text-sm">
+                               <Clock className="w-4 h-4 text-primary-500" />
+                               Schedule Custom Window
+                             </p>
+                             <div className="flex flex-col md:flex-row gap-4 items-end">
+                               <div className="flex-1">
+                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Start Time</label>
+                                 <input type="datetime-local" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all text-sm" value={scheduleStart} onChange={(e) => setScheduleStart(e.target.value)} />
+                               </div>
+                               <div className="flex-1">
+                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">End Time</label>
+                                 <input type="datetime-local" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all text-sm" value={scheduleEnd} onChange={(e) => setScheduleEnd(e.target.value)} />
+                               </div>
+                               <button onClick={() => handleToggleSession(null, scheduleStart, scheduleEnd)} disabled={sessionLoading || (!scheduleStart || !scheduleEnd)} className="px-6 py-3 bg-slate-900 text-white font-bold rounded-xl shadow-lg shadow-slate-200 hover:bg-slate-800 disabled:opacity-50 transition-all text-sm h-[46px] whitespace-nowrap">
+                                 Schedule
+                               </button>
+                             </div>
+                           </div>
+                        </div>
+                      )}
+                   </div>
+                </div>
+                <div className="hidden lg:block w-72 h-72 relative">
+                   <div className={`absolute inset-0 rounded-full border-8 transition-colors duration-1000 ${session.is_open ? 'border-green-500 animate-ping opacity-20' : 'border-slate-100'}`}></div>
+                   <div className={`absolute inset-0 m-4 rounded-full border-4 border-dashed animate-spin-slow ${session.is_open ? 'border-green-400 opacity-40' : 'border-slate-200'}`}></div>
+                   <div className={`absolute inset-0 m-12 rounded-full flex items-center justify-center shadow-inner ${session.is_open ? 'bg-green-50' : 'bg-slate-50'}`}>
+                      <Fingerprint className={`w-20 h-20 ${session.is_open ? 'text-green-500' : 'text-slate-200'}`} />
+                   </div>
+                </div>
+             </div>
+          </div>
         ) : (
           <div className="bg-white p-20 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center animate-fade-in">
               <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
@@ -843,8 +947,6 @@ const AdminDashboard = () => {
               </button>
           </div>
         )}
-      </div>
-    </div>
 
   {/* Add Student Modal */}
   {isAddModalOpen && (
@@ -949,170 +1051,6 @@ const AdminDashboard = () => {
       </div>
     </div>
   )}
-
-  <PortalSettings activeTab={activeTab} setActiveTab={setActiveTab} />
-  
-  </>
-  );
-};
-
-// Component for Portal Settings
-const PortalSettings = ({ activeTab, setActiveTab }) => {
-  if (activeTab !== 'settings') return null;
-
-  return (
-    <div className="flex-1 overflow-y-auto px-8 pb-8 custom-scrollbar bg-slate-50/30">
-       <div className="my-8 max-w-4xl">
-          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden p-8">
-             <div className="flex items-center gap-4 mb-8">
-                <div className="w-12 h-12 bg-primary-50 rounded-2xl flex items-center justify-center">
-                   <Settings className="w-6 h-6 text-primary-500" />
-                </div>
-                <div>
-                   <h2 className="text-xl font-black text-slate-800 uppercase">Portal Configuration</h2>
-                   <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Global System and Security settings</p>
-                </div>
-             </div>
-
-             <div className="space-y-8">
-                <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                   <h3 className="font-black text-slate-800 uppercase tracking-tight mb-4 flex items-center gap-2">
-                      <Shield className="w-4 h-4 text-primary-500" />
-                      Session Integrity
-                   </h3>
-                   <div className="space-y-4">
-                      <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100">
-                         <div>
-                            <p className="text-sm font-bold text-slate-800 uppercase">Anti-Proxy Enforcement</p>
-                            <p className="text-xs text-slate-400 font-medium">Verify student IP and location during attendance</p>
-                         </div>
-                         <div className="w-12 h-6 bg-primary-500 rounded-full relative shadow-inner">
-                            <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div>
-                         </div>
-                      </div>
-                      <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100">
-                         <div>
-                            <p className="text-sm font-bold text-slate-800 uppercase">Face ID Mandate</p>
-                            <p className="text-xs text-slate-400 font-medium">Require 3D liveness check for all sessions</p>
-                         </div>
-                         <div className="w-12 h-6 bg-primary-500 rounded-full relative shadow-inner">
-                            <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full"></div>
-                         </div>
-                      </div>
-                   </div>
-                </div>
-
-                <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                   <h3 className="font-black text-slate-800 uppercase tracking-tight mb-4 flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-amber-500" />
-                      Global Deadlines
-                   </h3>
-                   <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 bg-white rounded-2xl border border-slate-100">
-                         <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Morning Cutoff</p>
-                         <p className="text-lg font-black text-slate-800">12:00 PM</p>
-                      </div>
-                      <div className="p-4 bg-white rounded-2xl border border-slate-100">
-                         <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Gate Auto-Timeout</p>
-                         <p className="text-lg font-black text-slate-800">45 Minutes</p>
-                      </div>
-                   </div>
-                </div>
-             </div>
-          </div>
-       </div>
-    </div>
-  );
-};
-
-// Component for Daily History
-const DailyHistory = () => {
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-
-  const fetchHistory = async () => {
-    setLoading(true);
-    try {
-      const resp = await axios.get('/admin/attendance/history', { params: { date } });
-      setHistory(resp.data.data);
-    } catch (err) {
-      console.error('History fetch failed', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchHistory();
-  }, [date]);
-
-  const handleDownload = () => {
-    if (!history.length) return alert('No data to export');
-    const headers = ['Name', 'Roll Number', 'Branch', 'Section', 'Time', 'Status'];
-    const rows = history.map(h => [h.full_name, h.roll_number, h.branch, h.section, new Date(h.timestamp).toLocaleTimeString(), h.status]);
-    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Attendance_History_${date}.csv`;
-    a.click();
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <input 
-            type="date" 
-            className="px-4 py-2 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none" 
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-          <button onClick={fetchHistory} className="p-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800">
-            <RotateCcw className="w-5 h-5" />
-          </button>
-        </div>
-        <button onClick={handleDownload} className="flex items-center gap-2 px-6 py-2 bg-primary-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-primary-100 transition-all active:scale-95">
-          <Download className="w-4 h-4" />
-          Download CSV
-        </button>
-      </div>
-
-      <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-100">
-              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase">Student</th>
-              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase">Roll</th>
-              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase">Branch/Sec</th>
-              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase">Time</th>
-              <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase text-right">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {loading ? (
-              <tr><td colSpan="5" className="p-12 text-center text-slate-400 font-bold uppercase animate-pulse">Scanning Archive...</td></tr>
-            ) : history.length === 0 ? (
-              <tr><td colSpan="5" className="p-12 text-center text-slate-400 font-bold">No records found for this date</td></tr>
-            ) : history.map((h, i) => (
-              <tr key={i} className="hover:bg-slate-50 transition-colors">
-                <td className="px-6 py-4 text-xs font-black text-slate-800 uppercase tracking-tight">{h.full_name}</td>
-                <td className="px-6 py-4 text-xs font-bold text-slate-500">{h.roll_number}</td>
-                <td className="px-6 py-4">
-                  <span className="text-[10px] font-black px-2 py-0.5 bg-slate-100 rounded text-slate-600 uppercase">{h.branch} - {h.section}</span>
-                </td>
-                <td className="px-6 py-4 text-xs font-black text-slate-600">{new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                <td className="px-6 py-4 text-right">
-                   <span className={`text-[10px] font-black uppercase ${h.status === 'M' || h.status === 'P' ? 'text-green-600' : 'text-primary-600'}`}>
-                    {h.status === 'M' ? 'Morning' : (h.status === 'P' ? 'Afternoon' : h.status)}
-                   </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
     </div>
   );
