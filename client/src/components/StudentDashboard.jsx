@@ -76,7 +76,7 @@ const StudentDashboard = ({ user }) => {
       
       setServerTimeOffset(offset);
       console.log('Session response:', response.data, 'Clock Offset (ms):', offset);
-      setSession({ ...response.data, error: false, isExpired: false });
+      setSession({ ...(response.data || {}), error: false, isExpired: false });
     } catch (err) {
       console.error('Failed to fetch session', err);
       const isAuthError = err.response?.status === 401 || err.response?.status === 403;
@@ -255,18 +255,18 @@ const StudentDashboard = ({ user }) => {
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-3xl font-bold text-primary-600">{Math.round(stats.percentage)}%</span>
+              <span className="text-3xl font-bold text-primary-600">{Math.round(Number(stats?.percentage || 0))}%</span>
               <span className="text-sm text-slate-500">Overall</span>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4 mt-4 text-center">
             <div className="p-3 bg-primary-50 rounded-xl">
               <p className="text-sm text-primary-600 font-semibold">Present</p>
-              <p className="text-xl font-bold">{stats.present} Days</p>
+              <p className="text-xl font-bold">{Number(stats?.present || 0)} Days</p>
             </div>
             <div className="p-3 bg-slate-50 rounded-xl">
               <p className="text-sm text-slate-500 font-semibold">Total Days</p>
-              <p className="text-xl font-bold">{stats.total} Days</p>
+              <p className="text-xl font-bold">{Number(stats?.total || 0)} Days</p>
             </div>
           </div>
         </div>
