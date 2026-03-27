@@ -52,14 +52,18 @@ const App = () => {
     if (storedUser && storedToken) {
       try {
         const parsedUser = JSON.parse(storedUser);
-        console.log('Found valid session for:', parsedUser.email);
-        setUser(parsedUser);
-        // Set default header for future requests
-        axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+        if (parsedUser && typeof parsedUser === 'object') {
+          console.log('Found valid session for:', parsedUser.email || 'User');
+          setUser(parsedUser);
+          axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+        } else {
+          throw new Error('Invalid user storage format');
+        }
       } catch (err) {
-        console.error('Failed to parse stored user', err);
+        console.error('Session restoration failed:', err);
         localStorage.removeItem('user');
         localStorage.removeItem('token');
+        setUser(null);
       }
     } else {
       console.log('No stored session found');
