@@ -71,8 +71,13 @@ router.post('/google-login', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('GOOGLE_AUTH_ERROR:', error);
-    res.status(401).json({ message: 'Invalid Google token' });
+    console.error('--- GOOGLE_AUTH_DETAILED_ERROR ---');
+    console.error('Message:', error.message);
+    console.error('Used Client ID:', process.env.GOOGLE_CLIENT_ID);
+    res.status(401).json({ 
+      message: 'Invalid Google token', 
+      debug: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    });
   }
 });
 

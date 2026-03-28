@@ -1,5 +1,7 @@
 require('dotenv').config();
 const express = require('express');
+const { initDB } = require('./db');
+initDB(); // Initialize table
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const path = require('path');
@@ -21,6 +23,7 @@ if (missingEnv.length > 0) {
 // Middleware
 const allowedOrigins = [
   'http://localhost:5173',
+  'http://localhost:5174',
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
@@ -56,6 +59,16 @@ app.use('/api/admin', adminRoutes);
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'Attendance Portal Backend is running' });
+});
+
+// 404 Handler - Catch all for debugging
+app.use((req, res) => {
+  console.log(`[404] Not Found: ${req.method} ${req.url}`);
+  res.status(404).json({ 
+    message: 'Endpoint not found', 
+    requestedPath: req.url,
+    method: req.method 
+  });
 });
 
 app.listen(PORT, () => {

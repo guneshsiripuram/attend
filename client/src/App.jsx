@@ -17,14 +17,27 @@ const App = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('App mounting, checking auth status...');
     // Check if user is already logged in
     const storedUser = localStorage.getItem('user');
     const storedToken = localStorage.getItem('token');
     
     if (storedUser && storedToken) {
-      setUser(JSON.parse(storedUser));
-      // Set default header for future requests
-      axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        if (parsedUser && typeof parsedUser === 'object') {
+          console.log('Found valid session for:', parsedUser.email || 'User');
+          setUser(parsedUser);
+          axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+        } else {
+          throw new Error('Invalid user object in storage');
+        }
+      } catch (err) {
+        console.error('Session restoration failed:', err);
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        setUser(null);
+      }
     }
     setLoading(false);
   }, []);
@@ -54,7 +67,7 @@ const App = () => {
         <main className="container mx-auto px-4 py-8">
           <Routes>
             <Route path="/login" element={!user ? <Login onLogin={login} /> : <Navigate to={user.role === 'admin' ? '/admin' : '/student'} />} />
-            <Route path="/register" element={!user ? <Register /> : <Navigate to="/" />} />
+            <Route path="/register" element={!user || user.role === 'student' ? <Register /> : <Navigate to="/" />} />
             
             <Route 
               path="/student" 
