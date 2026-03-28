@@ -112,7 +112,7 @@ const StudentDashboard = ({ user }) => {
         clearInterval(livenessInterval);
         if (livenessStatus !== 'success') {
           setLivenessStatus('failed');
-          setResult({ success: false, message: 'Liveness fail: Please blink naturally at the camera.' });
+          setResult({ success: false, message: 'Verification Timeout: Please blink naturally. (Ensure your face is well-lit and you are on-campus)' });
           setIsVerifying(false);
         }
       }
