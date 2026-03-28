@@ -98,7 +98,7 @@ const StudentDashboard = ({ user }) => {
       if (frame) {
         const analysis = await FaceService.analyzeBase64(frame);
         framesForLiveness.push(analysis);
-        if (framesForLiveness.length > 10) framesForLiveness.shift();
+        if (framesForLiveness.length > 15) framesForLiveness.shift();
 
         if (FaceService.detectBlinkSequence(framesForLiveness)) {
           setBlinkDetected(true);
@@ -116,7 +116,7 @@ const StudentDashboard = ({ user }) => {
           setIsVerifying(false);
         }
       }
-    }, 250);
+    }, 150);
   };
 
   const performBurstCapture = async () => {
@@ -330,21 +330,22 @@ const StudentDashboard = ({ user }) => {
              
              {/* Liveness Overlays */}
              {isVerifying && livenessStatus === 'challenge' && (
-               <div className="absolute inset-0 bg-primary-600/90 backdrop-blur-md flex flex-col items-center justify-center z-50 transition-all">
-                  <Camera className="w-16 h-16 text-white mb-6 animate-bounce" />
-                  <h3 className="text-3xl font-black text-white uppercase tracking-tighter mb-2">Blink Now!</h3>
+               <div className="absolute inset-x-0 bottom-0 bg-slate-900/60 flex flex-col items-center justify-center z-50 transition-all py-6">
+                  <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-1">Blink Now!</h3>
                   <p className="text-white/80 text-[10px] font-bold uppercase tracking-widest">Verify liveness to continue</p>
-                  <div className="mt-8 flex gap-3">
-                    <div className={`w-3 h-3 rounded-full transition-all duration-500 ${blinkDetected ? 'bg-green-400 scale-150 shadow-lg shadow-green-400/50' : 'bg-white/20'}`} />
+                  <div className="mt-4 flex gap-3">
+                    <div className={`w-2.5 h-2.5 rounded-full transition-all duration-500 ${blinkDetected ? 'bg-green-400 scale-125 shadow-lg shadow-green-400/50' : 'bg-white/20'}`} />
                   </div>
                </div>
              )}
 
              {isVerifying && livenessStatus === 'success' && (
-                <div className="absolute inset-0 bg-green-600/90 backdrop-blur-md flex flex-col items-center justify-center z-50 animate-fade-in">
-                   <CheckCircle className="w-20 h-20 text-white mb-4 animate-scale-in" />
-                   <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Verified</h3>
-                   <p className="text-white/80 text-[10px] font-black uppercase tracking-widest mt-2">Capturing biometrics...</p>
+                <div className="absolute inset-x-0 bottom-0 bg-green-600/80 flex flex-col items-center justify-center z-50 animate-fade-in py-8">
+                   <div className="flex items-center gap-3">
+                     <CheckCircle className="w-6 h-6 text-white animate-scale-in" />
+                     <h3 className="text-xl font-black text-white uppercase tracking-tighter">Verified</h3>
+                   </div>
+                   <p className="text-white/80 text-[9px] font-black uppercase tracking-widest mt-1">Analyzing Biometric Sequence...</p>
                 </div>
              )}
 

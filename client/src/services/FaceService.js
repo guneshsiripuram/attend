@@ -361,8 +361,8 @@ class FaceService {
       return false;
     }
 
-    const openThreshold = 0.25;
-    const closedThreshold = 0.21;
+    const openThreshold = 0.24;
+    const closedThreshold = 0.18;
     let closedIndex = -1;
 
     for (let i = 0; i < ears.length; i += 1) {
