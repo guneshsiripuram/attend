@@ -88,10 +88,14 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     fetchData();
+    if (activeTab === 'matrix') {
+      fetchMatrix();
+    }
   }, [
     activeTab,
     filters.date, filters.name, filters.branch, filters.section, filters.rollNumber,
-    studentFilters.name, studentFilters.rollNumber, studentFilters.branch, studentFilters.section
+    studentFilters.name, studentFilters.rollNumber, studentFilters.branch, studentFilters.section,
+    fetchMatrix
   ]);
 
   useEffect(() => {
