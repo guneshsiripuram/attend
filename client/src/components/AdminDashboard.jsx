@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { Search, Filter, Download, Users, CheckCircle, Clock, AlertCircle, Shield, LogOut, ChevronRight, UserPlus, Settings, Database, RotateCcw, Trash2, Fingerprint, X, History, Loader, MapPin, LayoutDashboard, Calendar } from 'lucide-react';
+import AttendanceHistory from './AttendanceHistory';
 import { BRANCHES, SECTIONS } from '../constants';
 
 const AdminDashboard = () => {
@@ -231,6 +232,7 @@ const AdminDashboard = () => {
     { id: 'roster', label: 'Class Roster', icon: Users },
     { id: 'attendance', label: 'Live Logs', icon: LayoutDashboard },
     { id: 'matrix', label: 'Master Matrix', icon: Filter },
+    { id: 'history', label: 'Daily History', icon: Calendar },
     { id: 'students', label: 'Manage Students', icon: Users },
     { id: 'settings', label: 'Portal Settings', icon: Settings },
   ];
@@ -568,6 +570,7 @@ const AdminDashboard = () => {
             </div>
           )}
 
+          {activeTab === 'history' && <AttendanceHistory />}
 
           {activeTab === 'settings' && (
              <div className="mt-12 max-w-4xl mx-auto">
