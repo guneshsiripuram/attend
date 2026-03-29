@@ -79,44 +79,18 @@ const StudentDashboard = ({ user }) => {
   const isTrulyOpen = !!(session?.is_open && (!session.starts_at || new Date(session.starts_at) <= getServerNow()));
   const isScheduled = !!(!isTrulyOpen && session?.is_open && session.starts_at && new Date(session.starts_at) > getServerNow());
 
-  // 2. Liveness & Verification Flow
+  // 2. Direct Verification Flow (Liveness Removed)
   const handleVerify = async () => {
-    if (isVerifying || livenessStatus === 'challenge' || !isTrulyOpen) return;
+    if (isVerifying || !isTrulyOpen) return;
     
     setIsVerifying(true);
-    setLivenessStatus('challenge');
-    setBlinkDetected(false);
+    setLivenessStatus('idle'); // Show loading spinner immediately
     setResult(null);
 
-    const framesForLiveness = [];
-    const startLiveness = Date.now();
-    
-    // Blink Detection Loop
-    const livenessInterval = setInterval(async () => {
-      if (!webcamRef.current) return;
-      const frame = webcamRef.current.getScreenshot();
-      if (frame) {
-        const analysis = await FaceService.analyzeBase64(frame);
-        framesForLiveness.push(analysis);
-        if (framesForLiveness.length > 15) framesForLiveness.shift();
-
-        if (FaceService.detectBlinkSequence(framesForLiveness)) {
-          setBlinkDetected(true);
-          setLivenessStatus('success');
-          clearInterval(livenessInterval);
-          performBurstCapture();
-        }
-      }
-      
-      if (Date.now() - startLiveness > 15000) { // 15s timeout
-        clearInterval(livenessInterval);
-        if (livenessStatus !== 'success') {
-          setLivenessStatus('failed');
-          setResult({ success: false, message: 'Verification Timeout: Please blink naturally. (Ensure your face is well-lit and you are on-campus)' });
-          setIsVerifying(false);
-        }
-      }
-    }, 150);
+    // Briefly show the spinner before heavy processing thread blocks UI
+    setTimeout(() => {
+      performBurstCapture();
+    }, 100);
   };
 
   const performBurstCapture = async () => {
@@ -328,26 +302,7 @@ const StudentDashboard = ({ user }) => {
                videoConstraints={{ facingMode: "user" }}
              />
              
-             {/* Liveness Overlays */}
-             {isVerifying && livenessStatus === 'challenge' && (
-               <div className="absolute inset-x-0 bottom-0 bg-slate-900/60 flex flex-col items-center justify-center z-50 transition-all py-6">
-                  <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-1">Blink Now!</h3>
-                  <p className="text-white/80 text-[10px] font-bold uppercase tracking-widest">Verify liveness to continue</p>
-                  <div className="mt-4 flex gap-3">
-                    <div className={`w-2.5 h-2.5 rounded-full transition-all duration-500 ${blinkDetected ? 'bg-green-400 scale-125 shadow-lg shadow-green-400/50' : 'bg-white/20'}`} />
-                  </div>
-               </div>
-             )}
-
-             {isVerifying && livenessStatus === 'success' && (
-                <div className="absolute inset-x-0 bottom-0 bg-green-600/80 flex flex-col items-center justify-center z-50 animate-fade-in py-8">
-                   <div className="flex items-center gap-3">
-                     <CheckCircle className="w-6 h-6 text-white animate-scale-in" />
-                     <h3 className="text-xl font-black text-white uppercase tracking-tighter">Verified</h3>
-                   </div>
-                   <p className="text-white/80 text-[9px] font-black uppercase tracking-widest mt-1">Analyzing Biometric Sequence...</p>
-                </div>
-             )}
+             {/* Liveness Overlays (Removed for speed/reliability) */}
 
              {(isVerifying && livenessStatus === 'idle') && (
                <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center z-30">
