@@ -88,14 +88,10 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     fetchData();
-    if (activeTab === 'matrix') {
-      fetchMatrix();
-    }
   }, [
     activeTab,
     filters.date, filters.name, filters.branch, filters.section, filters.rollNumber,
-    studentFilters.name, studentFilters.rollNumber, studentFilters.branch, studentFilters.section,
-    fetchMatrix
+    studentFilters.name, studentFilters.rollNumber, studentFilters.branch, studentFilters.section
   ]);
 
   useEffect(() => {
@@ -211,6 +207,12 @@ const AdminDashboard = () => {
       setMatrixLoading(false);
     }
   }, [filters, matrixRange]);
+
+  useEffect(() => {
+    if (activeTab === 'matrix') {
+      fetchMatrix();
+    }
+  }, [activeTab, fetchMatrix]);
 
   const handleDownloadMatrix = () => {
     if (!matrixData.rows.length) return alert('No data to export');
