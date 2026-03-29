@@ -108,9 +108,25 @@ router.post('/register', async (req, res) => {
   }
 
   try {
-    let finalEmbedding = face_descriptor; // Accept direct descriptor from client
+    let finalEmbedding = req.body.face_descriptor; // Fixed reference error
     
     console.log('Registering user role:', normalizedRole, 'Email:', emailLower);
+
+    // STRICT IDENTITY UNIQUENESS CHECK
+    const duplicateCheck = await query(
+      'SELECT college_email, roll_number FROM users WHERE college_email = $1 OR roll_number = $2',
+      [emailLower, roll_number]
+    );
+
+    if (duplicateCheck.rows.length > 0) {
+      const dup = duplicateCheck.rows[0];
+      if (dup.college_email === emailLower) {
+        return res.status(400).json({ message: 'An account with this college email is already registered. Please log in.' });
+      }
+      if (dup.roll_number === roll_number) {
+        return res.status(400).json({ message: `The Roll Number ${roll_number} is already registered to another student account.` });
+      }
+    }
 
     if (!finalEmbedding && normalizedRole === 'student') {
       console.log('Face validation failed for student');
@@ -181,6 +197,17 @@ router.post('/complete-profile', async (req, res) => {
   
   try {
     console.log('Completing profile for:', email);
+    
+    // ENFORCE ROLL NUMBER UNIQUENESS FOR GOOGLE USERS
+    const duplicateRoll = await query(
+      'SELECT id FROM users WHERE roll_number = $1 AND college_email != $2', 
+      [roll_number, email.toLowerCase().trim()]
+    );
+    
+    if (duplicateRoll.rows.length > 0) {
+      return res.status(400).json({ message: `The Roll Number ${roll_number} is already claimed by another student account.` });
+    }
+
     const result = await query(
       'UPDATE users SET roll_number = $1, section = $2, branch = $3, face_embedding = $4 WHERE college_email = $5 RETURNING *',
       [roll_number, section, branch, JSON.stringify(face_descriptor), email.toLowerCase().trim()] // face_descriptor is now an array
