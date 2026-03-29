@@ -361,23 +361,23 @@ class FaceService {
       return false;
     }
 
-    const openThreshold = 0.26;
-    const closedThreshold = 0.20;
-    let closedStartIndex = -1;
+    const openThreshold = 0.24;
+    const closedThreshold = 0.18;
+    let closedIndex = -1;
 
-    for (let i = 0; i < ears.length - 1; i += 1) {
-      if (ears[i] < closedThreshold && ears[i + 1] < closedThreshold) {
-        closedStartIndex = i;
+    for (let i = 0; i < ears.length; i += 1) {
+      if (ears[i] < closedThreshold) {
+        closedIndex = i;
         break;
       }
     }
 
-    if (closedStartIndex === -1) {
+    if (closedIndex === -1) {
       return false;
     }
 
-    const openBefore = ears.slice(0, closedStartIndex).some((value) => value > openThreshold);
-    const openAfter = ears.slice(closedStartIndex + 2).some((value) => value > openThreshold);
+    const openBefore = ears.slice(0, closedIndex).some((value) => value > openThreshold);
+    const openAfter = ears.slice(closedIndex + 1).some((value) => value > openThreshold);
 
     return openBefore && openAfter;
   }
