@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const { compareDescriptors } = require('../utils/faceUtils');
 
 const router = express.Router();
 
@@ -133,6 +134,31 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'Face enrollment is required for students. Please record a short video.' });
     }
 
+    // STRICT BIOMETRIC DEDUPLICATION
+    if (finalEmbedding) {
+      console.log('Scanning face against global database for duplicates...');
+      const allUsersResult = await query('SELECT id, roll_number, face_embedding FROM users WHERE face_embedding IS NOT NULL AND role = $1', ['student']);
+      const threshold = 0.58; // Exact same severity as the attendance gate
+      
+      for (const existingUser of allUsersResult.rows) {
+        let storedEmbedding = existingUser.face_embedding;
+        if (typeof storedEmbedding === 'string') {
+          try { storedEmbedding = JSON.parse(storedEmbedding); } catch(e) {}
+        }
+        if (!storedEmbedding) continue;
+        
+        const faceDistance = compareDescriptors(storedEmbedding, finalEmbedding);
+        const similarity = 1 - faceDistance;
+        
+        if (similarity >= threshold) {
+          console.warn(`[SECURITY] Blocked duplicate face enrollment. Matches existing roll: ${existingUser.roll_number} (Sim: ${similarity.toFixed(3)})`);
+          return res.status(400).json({ 
+            message: `BIOMETRIC CONFLICT: This face is already enrolled under Roll Number ${existingUser.roll_number}. Duplicate physical registrations are strictly prohibited.` 
+          });
+        }
+      }
+    }
+
     console.log('Hashing password...');
     const hashedPassword = await bcrypt.hash(password, 10);
     console.log('Inserting user into database...');
@@ -206,6 +232,34 @@ router.post('/complete-profile', async (req, res) => {
     
     if (duplicateRoll.rows.length > 0) {
       return res.status(400).json({ message: `The Roll Number ${roll_number} is already claimed by another student account.` });
+    }
+
+    // STRICT BIOMETRIC DEDUPLICATION (For Google OAuth Users)
+    if (face_descriptor) {
+      console.log('Scanning face against global database for Google profile completion duplicates...');
+      const allUsersResult = await query(
+        'SELECT id, roll_number, face_embedding FROM users WHERE face_embedding IS NOT NULL AND college_email != $1 AND role = $2', 
+        [email.toLowerCase().trim(), 'student']
+      );
+      const threshold = 0.58; 
+      
+      for (const existingUser of allUsersResult.rows) {
+        let storedEmbedding = existingUser.face_embedding;
+        if (typeof storedEmbedding === 'string') {
+          try { storedEmbedding = JSON.parse(storedEmbedding); } catch(e) {}
+        }
+        if (!storedEmbedding) continue;
+        
+        const faceDistance = compareDescriptors(storedEmbedding, face_descriptor);
+        const similarity = 1 - faceDistance;
+        
+        if (similarity >= threshold) {
+          console.warn(`[SECURITY] Blocked duplicate face completion. Matches existing roll: ${existingUser.roll_number} (Sim: ${similarity.toFixed(3)})`);
+          return res.status(400).json({ 
+            message: `BIOMETRIC CONFLICT: This face is already enrolled under Roll Number ${existingUser.roll_number}. Duplicate physical registrations are strictly prohibited.` 
+          });
+        }
+      }
     }
 
     const result = await query(
