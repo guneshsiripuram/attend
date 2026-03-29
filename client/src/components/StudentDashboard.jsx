@@ -217,7 +217,15 @@ const StudentDashboard = ({ user }) => {
                     <p className="font-bold text-sm text-slate-800">{new Date(log.timestamp).toLocaleDateString('en-IN')}</p>
                     <p className="text-[10px] text-slate-400 font-bold uppercase">{new Date(log.timestamp).toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' })}</p>
                   </div>
-                  <span className="bg-green-100 text-green-700 px-3 py-1 rounded-lg text-[10px] font-black uppercase">Present</span>
+                  {log.status === 'Present' || log.status === 'P' || log.status === 'M' ? (
+                    <span className="bg-green-100 text-green-700 px-3 py-1 rounded-lg text-[10px] font-black uppercase">Present</span>
+                  ) : log.status === 'Failed_Location' ? (
+                    <span className="bg-red-50 text-red-600 border border-red-100 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest text-center shadow-sm">Location Failed</span>
+                  ) : log.status === 'Failed_Face' ? (
+                    <span className="bg-rose-50 text-rose-600 border border-rose-100 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest text-center shadow-sm">Identity Failed</span>
+                  ) : (
+                    <span className="bg-slate-100 text-slate-600 border border-slate-200 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest text-center shadow-sm">{log.status}</span>
+                  )}
                 </div>
               ))
             )}

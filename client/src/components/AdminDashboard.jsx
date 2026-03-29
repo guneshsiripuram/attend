@@ -200,7 +200,11 @@ const AdminDashboard = () => {
       const resp = await axios.get('/admin/attendance/matrix', { 
         params: { ...filters, startDate: matrixRange.start, endDate: matrixRange.end } 
       });
-      setMatrixData(resp.data);
+      // Bulletproof the response to prevent map() crashes on undefined properties
+      setMatrixData({ 
+        dates: resp.data?.dates || [], 
+        rows: resp.data?.rows || [] 
+      });
     } catch (err) {
       console.error('Matrix fetch failed', err);
     } finally {
