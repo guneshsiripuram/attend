@@ -89,7 +89,7 @@ const StudentDashboard = ({ user }) => {
     setResult(null);
 
     const framesForLiveness = [];
-    const startLiveness = Date.now();
+    let livenessSuccess = false;
     
     // Blink Detection Loop
     const livenessInterval = setInterval(async () => {
@@ -101,6 +101,7 @@ const StudentDashboard = ({ user }) => {
         if (framesForLiveness.length > 15) framesForLiveness.shift();
 
         if (FaceService.detectBlinkSequence(framesForLiveness)) {
+          livenessSuccess = true;
           setBlinkDetected(true);
           setLivenessStatus('success');
           clearInterval(livenessInterval);
@@ -110,9 +111,9 @@ const StudentDashboard = ({ user }) => {
       
       if (Date.now() - startLiveness > 15000) { // 15s timeout
         clearInterval(livenessInterval);
-        if (livenessStatus !== 'success') {
+        if (!livenessSuccess) {
           setLivenessStatus('failed');
-          setResult({ success: false, message: 'Verification Timeout: Please blink naturally. (Ensure your face is well-lit and you are on-campus)' });
+          setResult({ success: false, message: 'Verification Timeout: Please blink naturally and ensure your face is clearly visible in good lighting.' });
           setIsVerifying(false);
         }
       }
