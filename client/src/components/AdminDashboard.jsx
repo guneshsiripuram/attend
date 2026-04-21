@@ -200,13 +200,23 @@ const AdminDashboard = () => {
       const resp = await axios.get('/admin/attendance/matrix', { 
         params: { ...filters, startDate: matrixRange.start, endDate: matrixRange.end } 
       });
-      setMatrixData(resp.data);
+      // Bulletproof the response to prevent map() crashes on undefined properties
+      setMatrixData({ 
+        dates: resp.data?.dates || [], 
+        rows: resp.data?.rows || [] 
+      });
     } catch (err) {
       console.error('Matrix fetch failed', err);
     } finally {
       setMatrixLoading(false);
     }
   }, [filters, matrixRange]);
+
+  useEffect(() => {
+    if (activeTab === 'matrix') {
+      fetchMatrix();
+    }
+  }, [activeTab, fetchMatrix]);
 
   const handleDownloadMatrix = () => {
     if (!matrixData.rows.length) return alert('No data to export');
@@ -600,11 +610,11 @@ const AdminDashboard = () => {
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Time Left</p>
                                     <p className="text-3xl font-black text-slate-900 font-mono tabular-nums leading-none">
                                        {session.expires_at ? (() => {
-                                          const diff = new Date(session.expires_at) - (session.server_time ? new Date(session.server_time) : new Date());
-                                          if (diff <= 0) return '00:00';
-                                          const m = Math.floor(diff / 60000);
-                                          const s = Math.floor((diff % 60000) / 1000);
-                                          return `${m}:${s.toString().padStart(2, '0')}`;
+                                           const diff = new Date(session.expires_at) - (session.server_time ? new Date(session.server_time) : new Date());
+                                           if (diff <= 0) return '00:00';
+                                           const m = Math.floor(diff / 60000);
+                                           const s = Math.floor((diff % 60000) / 1000);
+                                           return `${m}:${s.toString().padStart(2, '0')}`;
                                        })() : '--:--'}
                                     </p>
                                  </div>

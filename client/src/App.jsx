@@ -37,6 +37,11 @@ const App = () => {
       (response) => response,
       (error) => {
         if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+          // If the error is exactly 403 from the /attendance/verify endpoint, pass it to the UI instead of logging out
+          if (error.response.status === 403 && error.config?.url?.includes('/verify')) {
+            return Promise.reject(error);
+          }
+          
           console.warn('Authentication failed (401/403). Logging out...');
           logout();
           window.location.href = '/login';
