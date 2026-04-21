@@ -181,6 +181,27 @@ const StudentDashboard = ({ user }) => {
     return () => clearTimeout(autoVerifyTimeout.current);
   }, [isAutoMode, result, isVerifying, isTrulyOpen, handleVerify]);
 
+  const getTodayStatus = useCallback(() => {
+    const todayStr = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).toISOString().split('T')[0];
+    
+    let fn = false;
+    let an = false;
+    
+    history.forEach(log => {
+      if (log.status !== 'Present') return;
+      const istTime = new Date(new Date(log.timestamp).toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+      const dateStr = istTime.toISOString().split('T')[0];
+      if (dateStr === todayStr) {
+        if (istTime.getHours() < 12) fn = true;
+        else an = true;
+      }
+    });
+
+    return { fn, an };
+  }, [history]);
+
+  const todayStatus = getTodayStatus();
+
   const chartData = [
     { name: 'Present', value: Number(stats?.present || 0) },
     { name: 'Absent', value: Math.max(0, Number(stats?.total || 0) - Number(stats?.present || 0)) },
@@ -212,6 +233,14 @@ const StudentDashboard = ({ user }) => {
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-center">
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Total</p>
               <p className="text-xl font-bold">{Number(stats?.total || 0)} Days</p>
+            </div>
+          </div>
+          
+          <div className="mt-4 p-4 rounded-2xl border border-slate-100 bg-white/60">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 text-center mb-3">Today's Status</p>
+            <div className="flex rounded-xl overflow-hidden shadow-sm">
+               <div className={`flex-1 text-center py-2.5 text-xs font-black tracking-widest transition-colors duration-500 ${todayStatus.fn ? 'bg-green-500 text-white' : 'bg-red-50 text-red-500 border border-red-100'}`}>FN</div>
+               <div className={`flex-1 text-center py-2.5 text-xs font-black tracking-widest transition-colors duration-500 ${todayStatus.an ? 'bg-green-500 text-white border-l border-white/20' : 'bg-red-50 text-red-500 border border-l-0 border-red-100'}`}>AN</div>
             </div>
           </div>
         </div>
