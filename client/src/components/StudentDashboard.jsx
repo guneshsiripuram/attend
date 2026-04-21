@@ -26,6 +26,7 @@ const StudentDashboard = ({ user }) => {
   const [serverTimeOffset, setServerTimeOffset] = useState(0); 
 
   const autoVerifyTimeout = useRef(null);
+  const isBlinkSuccessful = useRef(false);
 
   const checkSession = async () => {
     const localBefore = Date.now();
@@ -72,67 +73,7 @@ const StudentDashboard = ({ user }) => {
   const getServerNow = useCallback(() => new Date(Date.now() + serverTimeOffset), [serverTimeOffset]);
   const isTrulyOpen = !!(session?.is_open && (!session.starts_at || new Date(session.starts_at) <= getServerNow()));
 
-  const handleVerify = async () => {
-    if (isVerifying || livenessStatus === 'challenge' || !isTrulyOpen) return;
-    setIsVerifying(true);
-    setResult(null);
-    setBlinkDetected(false);
-    setLivenessStatus('checking_location');
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        try {
-          const locCheck = await axios.post('/attendance/check-location', { location: loc });
-          if (locCheck.data.success) {
-            startLivenessChallenge(loc);
-          }
-        } catch (err) {
-          setResult({ success: false, message: err.response?.data?.message || 'LOCATION FAILED' });
-          setLivenessStatus('idle');
-          setIsVerifying(false);
-        }
-      },
-      (err) => {
-        setResult({ success: false, message: 'LOCATION FAILED: GPS required.' });
-        setLivenessStatus('idle');
-        setIsVerifying(false);
-      },
-      { timeout: 8000 }
-    );
-  };
-
-  const startLivenessChallenge = (loc) => {
-    setLivenessStatus('challenge');
-    const framesForLiveness = [];
-    const startLivenessTime = Date.now();
-    
-    const livenessInterval = setInterval(async () => {
-      if (!webcamRef.current) return;
-      const frame = webcamRef.current.getScreenshot();
-      if (frame) {
-        const analysis = await FaceService.analyzeBase64(frame);
-        framesForLiveness.push(analysis);
-        if (framesForLiveness.length > 15) framesForLiveness.shift();
-        if (FaceService.detectBlinkSequence(framesForLiveness)) {
-          setBlinkDetected(true);
-          setLivenessStatus('success');
-          clearInterval(livenessInterval);
-          performFinalSubmit(loc);
-        }
-      }
-      if (Date.now() - startLivenessTime > 15000) {
-        clearInterval(livenessInterval);
-        if (livenessStatus !== 'success') {
-          setLivenessStatus('idle');
-          setResult({ success: false, message: 'IDENTITY FAILED: Blink timeout.' });
-          setIsVerifying(false);
-        }
-      }
-    }, 150);
-  };
-
-  const performFinalSubmit = async (loc) => {
+  const performFinalSubmit = useCallback(async (loc) => {
     const burstDescriptors = [];
     for (let i = 0; i < 8; i++) {
         if (!webcamRef.current) break;
@@ -167,14 +108,78 @@ const StudentDashboard = ({ user }) => {
     } finally {
       setIsVerifying(false);
     }
-  };
+  }, [fetchHistory]);
+
+  const startLivenessChallenge = useCallback((loc) => {
+    setLivenessStatus('challenge');
+    isBlinkSuccessful.current = false;
+    const framesForLiveness = [];
+    const startLivenessTime = Date.now();
+    
+    const livenessInterval = setInterval(async () => {
+      if (!webcamRef.current) return;
+      if (isBlinkSuccessful.current) return; // Fix: Prevent execution if already successful
+
+      const frame = webcamRef.current.getScreenshot();
+      if (frame) {
+        const analysis = await FaceService.analyzeBase64(frame);
+        framesForLiveness.push(analysis);
+        if (framesForLiveness.length > 15) framesForLiveness.shift();
+        if (FaceService.detectBlinkSequence(framesForLiveness)) {
+          isBlinkSuccessful.current = true;
+          setBlinkDetected(true);
+          setLivenessStatus('success');
+          clearInterval(livenessInterval);
+          performFinalSubmit(loc);
+        }
+      }
+      if (Date.now() - startLivenessTime > 15000) {
+        clearInterval(livenessInterval);
+        if (!isBlinkSuccessful.current) { // Fix: Check ref instead of stale state
+          setLivenessStatus('idle');
+          setResult({ success: false, message: 'IDENTITY FAILED: Blink timeout.' });
+          setIsVerifying(false);
+        }
+      }
+    }, 150);
+  }, [performFinalSubmit]);
+
+  const handleVerify = useCallback(async () => {
+    if (isVerifying || livenessStatus === 'challenge' || !isTrulyOpen) return;
+    setIsVerifying(true);
+    setResult(null);
+    setBlinkDetected(false);
+    setLivenessStatus('checking_location');
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        try {
+          const locCheck = await axios.post('/attendance/check-location', { location: loc });
+          if (locCheck.data.success) {
+            startLivenessChallenge(loc);
+          }
+        } catch (err) {
+          setResult({ success: false, message: err.response?.data?.message || 'LOCATION FAILED' });
+          setLivenessStatus('idle');
+          setIsVerifying(false);
+        }
+      },
+      (err) => {
+        setResult({ success: false, message: 'LOCATION FAILED: GPS required.' });
+        setLivenessStatus('idle');
+        setIsVerifying(false);
+      },
+      { timeout: 8000 }
+    );
+  }, [isVerifying, livenessStatus, isTrulyOpen, startLivenessChallenge]);
 
   useEffect(() => {
     if (isAutoMode && !result?.success && !isVerifying && isTrulyOpen) {
       autoVerifyTimeout.current = setTimeout(handleVerify, 1500);
     }
     return () => clearTimeout(autoVerifyTimeout.current);
-  }, [isAutoMode, result, isVerifying, isTrulyOpen]);
+  }, [isAutoMode, result, isVerifying, isTrulyOpen, handleVerify]);
 
   const chartData = [
     { name: 'Present', value: Number(stats?.present || 0) },

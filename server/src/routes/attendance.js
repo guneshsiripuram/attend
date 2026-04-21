@@ -108,12 +108,12 @@ router.post('/verify', authMiddleware, async (req, res) => {
      const { compareDescriptors } = require('../utils/faceUtils');
      const faceDistance = compareDescriptors(finalStored, face_descriptor);
      const similarity = 1 - faceDistance; 
-     const threshold = 0.55;
+     const threshold = 0.40;
 
      if (similarity < threshold) {
         await query(
           'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',
-          [userId, user.roll_number, user.section, 'Failed_Face', JSON.stringify(location)]
+          [userId, user.roll_number, user.section, 'Failed_Match', JSON.stringify(location)]
         );
         return res.status(403).json({ message: 'IDENTITY FAILED: Face match failed.', details: 'Ensure you are in a well-lit area and looking directly at the camera.' });
      }
@@ -142,8 +142,8 @@ router.get('/me', authMiddleware, async (req, res) => {
       [req.user.id]
     );
     
-    // FIX: Calculate totalDays from ALL unique dates in the system logs (IST)
-    const dayCountResult = await query('SELECT COUNT(DISTINCT ("timestamp" AT TIME ZONE \'Asia/Kolkata\')::date) as count FROM attendance_logs');
+    // FIX: Calculate totalDays from ONLY valid active days (status = 'Present')
+    const dayCountResult = await query('SELECT COUNT(DISTINCT ("timestamp" AT TIME ZONE \'Asia/Kolkata\')::date) as count FROM attendance_logs WHERE status = \'Present\'');
     const totalDays = parseInt(dayCountResult.rows[0].count) || 1; 
 
     const statsByDate = {};
@@ -157,7 +157,11 @@ router.get('/me', authMiddleware, async (req, res) => {
       statsByDate[dateStr][session] = true;
     });
 
-    const presentDays = Object.values(statsByDate).filter(day => day.morning && day.afternoon).length;
+    const presentDays = Object.values(statsByDate).reduce((acc, day) => {
+      if (day.morning && day.afternoon) return acc + 1;
+      if (day.morning || day.afternoon) return acc + 0.5;
+      return acc;
+    }, 0);
     const percentage = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
 
     res.json({ logs: result.rows, stats: { percentage, present: presentDays, total: totalDays } });

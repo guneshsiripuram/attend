@@ -91,8 +91,14 @@ class FaceService {
 
     if (ears.length < 5) return false;
 
-    const openThreshold = 0.24;
-    const closedThreshold = 0.18;
+    // Fix Bug 5: Dynamic relative EAR threshold calculation
+    // Assume the user starts with open eyes, so max EAR is baseline
+    const baselineEAR = Math.max(...ears.slice(0, 3));
+    
+    // A blink is typically a 20-25% drop in EAR from baseline
+    const openThreshold = baselineEAR * 0.90;
+    const closedThreshold = baselineEAR * 0.75;
+    
     let closedIndex = -1;
 
     for (let i = 0; i < ears.length; i++) {
