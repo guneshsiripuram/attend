@@ -42,13 +42,8 @@ router.get('/attendance/all', authMiddleware, adminMiddleware, async (req, res) 
     q += ` AND u.college_email ILIKE $${params.length}`;
   }
   if (date) {
-    const startDate = new Date(date);
-    const endDate = new Date(date);
-    endDate.setDate(endDate.getDate() + 1);
-    
-    params.push(startDate.toISOString().split('T')[0]);
-    params.push(endDate.toISOString().split('T')[0]);
-    q += ` AND al.timestamp >= $${params.length - 1} AND al.timestamp < $${params.length}`;
+    params.push(date);
+    q += ` AND (al.timestamp AT TIME ZONE 'Asia/Kolkata')::date = $${params.length}`;
   }
 
   q += ` GROUP BY u.id, u.full_name, u.college_email, u.roll_number, u.section, u.branch, log_date, session`;
@@ -60,10 +55,8 @@ router.get('/attendance/all', authMiddleware, adminMiddleware, async (req, res) 
     // Summary data
     const summaryResult = await query(`
       SELECT 
-        COUNT(DISTINCT user_id) FILTER (WHERE status = 'Present') as presentToday,
-        COUNT(DISTINCT user_id) as totalStudents
-      FROM attendance_logs
-      WHERE timestamp::date = CURRENT_DATE
+        (SELECT COUNT(*) FROM users WHERE role = 'student')::int as "totalstudents",
+        (SELECT COUNT(DISTINCT user_id) FROM attendance_logs WHERE timestamp::date = CURRENT_DATE AND status = 'Present')::int as "presenttoday"
     `);
 
     res.json({ 
@@ -187,11 +180,13 @@ router.post('/students/:id/reset-face', authMiddleware, adminMiddleware, async (
 // Delete Student
 router.delete('/students/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    // Note: We might want to keep logs or use CASCADE. Here we delete logs first.
+    await query('BEGIN');
     await query('DELETE FROM attendance_logs WHERE user_id = $1', [req.params.id]);
     await query('DELETE FROM users WHERE id = $1', [req.params.id]);
+    await query('COMMIT');
     res.json({ message: 'Student removed successfully' });
   } catch (error) {
+    await query('ROLLBACK');
     console.error(error);
     res.status(500).json({ message: 'Failed to delete student' });
   }
@@ -300,7 +295,8 @@ router.post('/session/toggle', authMiddleware, adminMiddleware, async (req, res)
       message: `Attendance gate ${isOpen ? (startTime ? 'SCHEDULED' : 'OPEN') : 'CLOSED'}`, 
       startsAt, 
       expiresAt,
-      serverTime: new Date() 
+      serverTime: new Date(),
+      isOpen
     });
   } catch (error) {
     console.error('--- SESSION_TOGGLE_ERROR ---');

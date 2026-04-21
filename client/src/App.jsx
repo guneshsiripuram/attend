@@ -97,7 +97,7 @@ const App = () => {
             
             <Route 
               path="/admin" 
-              element={user?.role === 'admin' ? <AdminDashboard /> : <Navigate to="/login" />} 
+              element={user?.role === 'admin' ? <AdminDashboard user={user} /> : <Navigate to="/login" />} 
             />
             
             <Route path="/" element={<Navigate to={user ? (user.role === 'admin' ? '/admin' : '/student') : '/login'} />} />
