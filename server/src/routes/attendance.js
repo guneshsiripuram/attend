@@ -32,25 +32,25 @@ router.post('/verify', authMiddleware, async (req, res) => {
   console.log('[VERIFY_USER] ID:', userId);
 
   try {
-     // 1. Session Gatekeeper Check
-     const sessionResult = await query('SELECT is_open, session_starts_at, expires_at FROM portal_settings WHERE id = 1');
-     const session = sessionResult.rows[0];
-     
-     if (!session || !session.is_open) {
-       return res.status(403).json({ message: 'Portal Closed: Faculty has not opened attendance for this session.' });
-     }
-     
-     const now = new Date();
-     
-     if (session.session_starts_at && now < new Date(session.session_starts_at)) {
-       return res.status(403).json({ message: 'Portal Scheduled: The attendance window has not started yet.' });
-     }
-     
-     if (session.expires_at && now > new Date(session.expires_at)) {
-       // Auto-close if expired
-       await query('UPDATE portal_settings SET is_open = false, session_starts_at = NULL, expires_at = NULL WHERE id = 1');
-       return res.status(403).json({ message: 'Session Expired: The attendance window has closed automatically.' });
-     }
+    // 0. Session Gatekeeper Check
+    const sessionResult = await query("SELECT is_open, session_starts_at, expires_at FROM portal_settings WHERE id = 1");
+    const session = sessionResult.rows[0];
+    
+    if (!session || !session.is_open) {
+      return res.status(403).json({ message: 'Portal Closed: Faculty has not opened attendance for this session.' });
+    }
+    
+    const now = new Date();
+    
+    if (session.session_starts_at && now < new Date(session.session_starts_at)) {
+      return res.status(403).json({ message: 'Portal Scheduled: The attendance window has not started yet.' });
+    }
+    
+    if (session.expires_at && now > new Date(session.expires_at)) {
+      // Auto-close if expired
+      await query("UPDATE portal_settings SET is_open = FALSE, session_starts_at = NULL, expires_at = NULL WHERE id = 1");
+      return res.status(403).json({ message: 'Session Expired: The attendance window has closed automatically.' });
+    }
 
     // --- SESSION ENFORCEMENT (Forced IST/Asia/Kolkata) ---
     const istTime = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
@@ -63,7 +63,7 @@ router.post('/verify', authMiddleware, async (req, res) => {
       `SELECT id FROM attendance_logs 
        WHERE user_id = $1 AND status = 'Present' 
        AND (timestamp AT TIME ZONE 'Asia/Kolkata')::date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date 
-       AND (CASE WHEN EXTRACT(HOUR FROM "timestamp" AT TIME ZONE 'Asia/Kolkata') < 12 THEN 'Morning' ELSE 'Afternoon' END) = $2`,
+       AND (CASE WHEN EXTRACT(HOUR FROM timestamp AT TIME ZONE 'Asia/Kolkata') < 12 THEN 'Morning' ELSE 'Afternoon' END) = $2`,
       [userId, currentSession]
     );
 
@@ -74,15 +74,13 @@ router.post('/verify', authMiddleware, async (req, res) => {
     }
     // ---------------------------------------------------
 
-     // 1. Fetch user data (including roll_number, section and embedding)
-     const userResult = await query('SELECT full_name, roll_number, section, face_embedding FROM users WHERE id = $1', [userId]);
-     const user = userResult.rows[0];
+    // 1. Fetch user data (including roll_number, section and embedding)
+    const userResult = await query('SELECT full_name, roll_number, section, face_embedding FROM users WHERE id = $1', [userId]);
+    const user = userResult.rows[0];
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-
-     // --- Identity Check Removed (Using Database Ground Truth) ---
 
     if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') {
       console.error('[VERIFY_ERROR] Invalid location data:', location);
@@ -102,20 +100,19 @@ router.post('/verify', authMiddleware, async (req, res) => {
     console.log(`[DEBUG] Campus Center: ${campusLat}, ${campusLng}`);
     console.log(`[DEBUG] Calculated Distance: ${distance.toFixed(2)}m (Max: ${MAX_DISTANCE}m)`);
 
-     if (!isInside) {
-       console.warn(`[VERIFY_LOCATION_FAILED] User ${userId} is outside campus boundary. Distance: ${distance.toFixed(2)}m/Max: ${MAX_DISTANCE}m`);
-        
-       await query(
-         'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',
-         [userId, user.roll_number, user.section, 'Failed_Location', JSON.stringify({ ...location, distance, maxDistance: MAX_DISTANCE })]
-       );
+    if (!isInside) {
+      await query(
+        'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',
+        [userId, user.roll_number, user.section, 'Failed_Location', JSON.stringify({ ...location, distance, maxDistance: MAX_DISTANCE })]
+      );
       return res.status(403).json({ 
         message: `Outside Campus: ${distance.toFixed(2)}m away`,
         details: `You are currently ${distance.toFixed(2)}m away from the campus gate. Maximum allowed is ${MAX_DISTANCE}m.`
       });
     }
 
-    if (!face_descriptor) {
+    // 3. Process Live Identity (Burst of descriptors from Client)
+    if (!face_descriptor || (Array.isArray(face_descriptor) && face_descriptor.length === 0)) {
       return res.status(400).json({ message: 'Missing facial data for verification.' });
     }
 
@@ -130,51 +127,45 @@ router.post('/verify', authMiddleware, async (req, res) => {
         }
     }
 
-    const finalStored = Array.isArray(storedEmbedding) ? storedEmbedding : (storedEmbedding?.descriptor || storedEmbedding);
+    const { compareDescriptors } = require('../utils/faceUtils');
     
-    if (!finalStored) {
-      return res.status(400).json({ 
-        message: 'Face enrollment required. Please register your face first.',
-        needsEnrollment: true 
+    // compareDescriptors now handles (GallerySet, ProbeSet) and returns MIN distance
+    const faceDistance = compareDescriptors(storedEmbedding, face_descriptor);
+    const similarity = 1 - faceDistance; 
+    
+    console.log(`[DEBUG] Burst Comparison: Best Distance=${faceDistance.toFixed(4)}, Similarity=${similarity.toFixed(4)}`);
+    
+    // With multi-sample matching, we can keep 0.55 or slightly increase to 0.60 for even higher security.
+    const threshold = 0.58; 
+
+    if (similarity < threshold) {
+      console.log(`[DEBUG] Match failed: ${similarity} < ${threshold}`);
+      await query(
+        'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',
+        [userId, user.roll_number, user.section, 'Failed_Face', JSON.stringify({ ...location, similarity: similarity.toFixed(4) })]
+      );
+      return res.status(403).json({ 
+        message: 'Identity Not Confident', 
+        details: 'Biometric match score was below the required security threshold. Please ensure you are not using a photo and blink clearly.',
+        similarity 
       });
     }
 
-    const { compareDescriptors } = require('../utils/faceUtils');
-    
-    // Detailed logging for debugging
-    console.log(`[DEBUG] FinalStored: type=${typeof finalStored}, isArray=${Array.isArray(finalStored)}, len=${finalStored?.length}`);
-    console.log(`[DEBUG] ProvidedDescriptor: type=${typeof face_descriptor}, isArray=${Array.isArray(face_descriptor)}, len=${face_descriptor?.length}`);
-    
-    const faceDistance = compareDescriptors(finalStored, face_descriptor);
-    const similarity = 1 - faceDistance; 
-    
-    console.log(`[DEBUG] Comparison: FaceDistance=${faceDistance.toFixed(4)}, Similarity=${similarity.toFixed(4)}`);
-    const threshold = 0.55;
+    console.log(`[DEBUG] Verification Successful! Recording attendance...`);
+    // 6. Success
+    await query(
+      'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',
+      [userId, user.roll_number, user.section, 'Present', JSON.stringify(location)]
+    );
 
-    if (similarity < threshold) { // Assuming 0.6 is the distance threshold for a match (1 - 0.4 similarity threshold)
-       console.warn(`[VERIFY_FACE_FAILED] No match for ${userId}. Distance: ${faceDistance}`);
-       await query(
-         'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',
-         [userId, user.roll_number, user.section, 'Failed_Face', JSON.stringify(location)]
-       );
-      return res.status(403).json({ message: 'Match Failed', details: 'The face captured does not match your registered profile. Please ensure your face is clearly visible and well-lit.' });
-    }
-
-     console.log(`[DEBUG] Verification Successful! Recording attendance...`);
-     // 6. Success
-     await query(
-       'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',
-       [userId, user.roll_number, user.section, 'Present', JSON.stringify(location)]
-     );
-
-     res.json({ 
-       message: 'Attendance Marked! Success.', 
-       confidence: similarity,
-       student: {
-         name: user.full_name,
-         rollNumber: user.roll_number
-       }
-     });
+    res.json({ 
+      message: 'Attendance Marked! Success.', 
+      confidence: similarity,
+      student: {
+        name: user.full_name,
+        rollNumber: user.roll_number
+      }
+    });
   } catch (error) {
     console.error('[ATTENDANCE_CRITICAL_ERROR]:', error);
     res.status(500).json({ 
@@ -193,9 +184,13 @@ router.get('/me', authMiddleware, async (req, res) => {
       [req.user.id]
     );
     
-    // Calculate stats dynamic based on unique capture days in system
-    const dayCountResult = await query('SELECT COUNT(DISTINCT "timestamp"::date) as count FROM attendance_logs');
-    const totalDays = parseInt(dayCountResult.rows[0].count) || 1; 
+    // FIX: Calculate total attendance days based on unique days in system logs.
+    // This ensures total days increase day by day as long as the system is being used.
+    const dayCountResult = await query(`
+      SELECT COUNT(DISTINCT (timestamp AT TIME ZONE 'Asia/Kolkata')::date) as count 
+      FROM attendance_logs
+    `);
+    const totalDays = parseInt(dayCountResult.rows[0].count) || 0; 
 
     // Full-day logic: Must have at least one morning (<12) AND one afternoon (>=12) log (IST)
     const statsByDate = {};
@@ -213,7 +208,7 @@ router.get('/me', authMiddleware, async (req, res) => {
     });
 
     const presentDays = Object.values(statsByDate).filter(day => day.morning && day.afternoon).length;
-    const percentage = (presentDays / totalDays) * 100;
+    const percentage = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
 
     res.json({ logs: result.rows, stats: { percentage, present: presentDays, total: totalDays } });
   } catch (error) {
@@ -235,6 +230,7 @@ router.get('/session', authMiddleware, async (req, res) => {
       console.log('--- STUDENT SESSION AUTO-CLOSED (EXPIRED) ---');
     }
 
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.json({
       ...session,
       server_time: new Date()

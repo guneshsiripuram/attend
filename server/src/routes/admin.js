@@ -30,12 +30,12 @@ router.get('/attendance/all', authMiddleware, adminMiddleware, async (req, res) 
     q += ` AND u.roll_number ILIKE $${params.length}`;
   }
   if (branch) {
-    params.push(`%${branch}%`);
-    q += ` AND u.branch ILIKE $${params.length}`;
+    params.push(branch);
+    q += ` AND u.branch = $${params.length}`;
   }
   if (section) {
-    params.push(`%${section}%`);
-    q += ` AND u.section ILIKE $${params.length}`;
+    params.push(section);
+    q += ` AND u.section = $${params.length}`;
   }
   if (email) {
     params.push(`%${email}%`);
@@ -154,12 +154,12 @@ router.get('/students', authMiddleware, adminMiddleware, async (req, res) => {
     q += ` AND roll_number ILIKE $${params.length}`;
   }
   if (branch) {
-    params.push(`%${branch}%`);
-    q += ` AND branch ILIKE $${params.length}`;
+    params.push(branch);
+    q += ` AND branch = $${params.length}`;
   }
   if (section) {
-    params.push(`%${section}%`);
-    q += ` AND section ILIKE $${params.length}`;
+    params.push(section);
+    q += ` AND section = $${params.length}`;
   }
 
   q += ` ORDER BY full_name ASC`;
@@ -206,24 +206,31 @@ router.get('/attendance/history', authMiddleware, adminMiddleware, async (req, r
 
     const q = `
       SELECT 
-        (al.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date as date,
-        COUNT(DISTINCT al.user_id) as present_count,
+        date,
+        COUNT(*) as present_count,
         json_agg(json_build_object(
-          'id', al.id,
-          'timestamp', al.timestamp,
-          'status', al.status,
-          'user_id', al.user_id,
-          'full_name', u.full_name,
-          'roll_number', u.roll_number,
-          'email', u.college_email,
-          'section', u.section,
-          'branch', u.branch
-        ) ORDER BY al.timestamp DESC) as present_records
-      FROM attendance_logs al
-      JOIN users u ON al.user_id = u.id
-      WHERE al.status = 'Present'
-      GROUP BY (al.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date
-      ORDER BY (al.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date DESC
+          'id', id,
+          'timestamp', timestamp,
+          'status', status,
+          'user_id', user_id,
+          'full_name', full_name,
+          'roll_number', roll_number,
+          'email', college_email,
+          'section', section,
+          'branch', branch
+        ) ORDER BY timestamp DESC) as present_records
+      FROM (
+        SELECT DISTINCT ON (al.user_id, (al.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date)
+          al.id, al.timestamp, al.status, al.user_id,
+          u.full_name, u.roll_number, u.college_email, u.section, u.branch,
+          (al.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date as date
+        FROM attendance_logs al
+        JOIN users u ON al.user_id = u.id
+        WHERE al.status = 'Present'
+        ORDER BY al.user_id, (al.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date, al.timestamp DESC
+      ) unique_logs
+      GROUP BY date
+      ORDER BY date DESC
     `;
     const result = await query(q);
 
@@ -254,7 +261,7 @@ router.get('/session', authMiddleware, async (req, res) => {
       console.log('--- SESSION AUTO-CLOSED (EXPIRED) ---');
     }
 
-    // Attach current server time to help frontend calculate relative countdowns/status
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.json({
         ...session,
         server_time: new Date()
@@ -289,20 +296,28 @@ router.post('/session/toggle', authMiddleware, adminMiddleware, async (req, res)
       [isOpen, startsAt, expiresAt]
     );
     
-    res.json({ message: `Attendance gate ${isOpen ? (startTime ? 'SCHEDULED' : 'OPEN') : 'CLOSED'}`, startsAt, expiresAt });
+    res.json({ 
+      message: `Attendance gate ${isOpen ? (startTime ? 'SCHEDULED' : 'OPEN') : 'CLOSED'}`, 
+      startsAt, 
+      expiresAt,
+      serverTime: new Date() 
+    });
   } catch (error) {
     console.error('--- SESSION_TOGGLE_ERROR ---');
-    console.error('Error details:', error.message);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    
     res.status(500).json({ 
       message: 'Error toggling session',
-      error: error.message 
+      error: error.message,
+      details: error.stack ? 'Check server logs for detailed trace' : 'Internal Server Error'
     });
   }
 });
 
 // Get Attendance Matrix (Pivot Table for Excel-style view)
 router.get('/attendance/matrix', authMiddleware, adminMiddleware, async (req, res) => {
-  const { branch, section, startDate, endDate } = req.query;
+  const { branch, section, startDate, endDate, rollNumber } = req.query;
   
   try {
     // 1. Fetch Students
@@ -310,6 +325,10 @@ router.get('/attendance/matrix', authMiddleware, adminMiddleware, async (req, re
     const studentParams = [];
     if (branch) { studentParams.push(branch); studentQ += ` AND branch = $${studentParams.length}`; }
     if (section) { studentParams.push(section); studentQ += ` AND section = $${studentParams.length}`; }
+    if (rollNumber) { 
+      studentParams.push(`%${rollNumber}%`); 
+      studentQ += ` AND roll_number ILIKE $${studentParams.length}`; 
+    }
     studentQ += ` ORDER BY roll_number ASC`;
     const studentsResult = await query(studentQ, studentParams);
     const students = studentsResult.rows;
