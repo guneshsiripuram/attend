@@ -430,7 +430,9 @@ const AdminDashboard = ({ user }) => {
                       <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
                         <td className="px-8 py-6">
                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white text-sm group-hover:shadow-md transition-all uppercase" style={{ backgroundColor: stringToColor(log.full_name) }}>{log.full_name?.charAt(0) || '?'}</div>
+                              <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center font-black text-slate-500 text-sm group-hover:bg-white group-hover:shadow-md transition-all">
+                                 #{(currentPage - 1) * 50 + i + 1}
+                              </div>
                               <div>
                                  <p className="text-sm font-black text-slate-900 uppercase tracking-tight">{log.full_name}</p>
                                  <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider font-mono">{log.roll_number}</p>
@@ -607,7 +609,9 @@ const AdminDashboard = ({ user }) => {
                       <tr key={i} className="hover:bg-slate-50/50 transition-colors group border-b border-slate-50">
                         <td className="px-8 py-6">
                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white text-sm transition-all uppercase shadow-sm" style={{ backgroundColor: stringToColor(student.full_name) }}>{student.full_name?.charAt(0)}</div>
+                              <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center font-black text-slate-500 text-sm group-hover:bg-white group-hover:shadow-md transition-all">
+                                 #{(currentPage - 1) * 50 + i + 1}
+                              </div>
                               <div>
                                  <p className="text-sm font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
                                     {student.full_name}
