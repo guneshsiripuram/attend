@@ -400,4 +400,25 @@ router.get('/attendance/matrix', authMiddleware, adminMiddleware, async (req, re
   }
 });
 
+// System Health Check
+router.get('/health', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const dbCheck = await query('SELECT 1 as is_alive');
+    const logsCount = await query('SELECT COUNT(*) FROM attendance_logs');
+    const usersCount = await query('SELECT COUNT(*) FROM users');
+    
+    res.json({
+      status: 'operational',
+      database: dbCheck.rows[0].is_alive === 1 ? 'connected' : 'error',
+      metrics: {
+        total_logs: parseInt(logsCount.rows[0].count),
+        total_users: parseInt(usersCount.rows[0].count)
+      },
+      timestamp: new Date()
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: 'Database connection failed' });
+  }
+});
+
 module.exports = router;

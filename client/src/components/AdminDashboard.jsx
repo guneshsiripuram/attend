@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { Search, Filter, Download, Users, CheckCircle, Clock, AlertCircle, Shield, LogOut, ChevronRight, UserPlus, Settings, Database, RotateCcw, Trash2, Fingerprint, X, History, Loader, MapPin, LayoutDashboard, Calendar } from 'lucide-react';
 import AttendanceHistory from './AttendanceHistory';
@@ -26,6 +26,12 @@ const AdminDashboard = ({ user }) => {
   const [rosterSummary, setRosterSummary] = useState({ totalEnrolled: 0, presentCount: 0, absentCount: 0 });
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('roster');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [now, setNow] = useState(Date.now());
+  const [healthData, setHealthData] = useState(null);
+  
+  const [toast, setToast] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, message: '', action: null });
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
@@ -54,8 +60,8 @@ const AdminDashboard = ({ user }) => {
     }
   }, []);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (isPolling = false) => {
+    if (!isPolling) setLoading(true);
     fetchSession();
     try {
       if (activeTab === 'attendance') {
@@ -78,25 +84,46 @@ const AdminDashboard = ({ user }) => {
           params: { name, rollNumber, branch, section }
         });
         setStudents(resp.data.data);
+      } else if (activeTab === 'health') {
+        const resp = await axios.get('/admin/health');
+        setHealthData(resp.data);
       }
     } catch (err) {
       console.error('Failed to fetch admin data', err);
     } finally {
-      setLoading(false);
+      if (!isPolling) setLoading(false);
     }
   }, [activeTab, filters, studentFilters, fetchSession]);
 
   useEffect(() => {
     fetchData();
+    setCurrentPage(1);
   }, [fetchData]);
 
   useEffect(() => {
     let interval;
     if (activeTab === 'roster' || activeTab === 'attendance') {
-      interval = setInterval(fetchData, 5000);
+      interval = setInterval(() => fetchData(true), 5000);
     }
     return () => clearInterval(interval);
   }, [activeTab, fetchData]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const stringToColor = (str) => {
+    let hash = 0;
+    if (!str) return 'hsl(0, 0%, 50%)';
+    for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    return `hsl(${hash % 360}, 65%, 45%)`;
+  };
 
   const handleToggleSession = async (minutes, startTime = null, endTime = null) => {
     setSessionLoading(true);
@@ -125,24 +152,36 @@ const AdminDashboard = ({ user }) => {
     }
   };
 
-  const handleResetFace = async (id) => {
-    if (!window.confirm('Reset this student\'s face data?')) return;
-    try {
-      await axios.post(`/admin/students/${id}/reset-face`);
-      fetchData();
-    } catch (err) {
-      alert('Failed to reset face data');
-    }
+  const handleResetFace = (id) => {
+    setConfirmDialog({
+      isOpen: true,
+      message: 'Are you sure you want to completely reset this student\'s face biometric data?',
+      action: async () => {
+        try {
+          await axios.post(`/admin/students/${id}/reset-face`);
+          fetchData();
+          showToast('Face biometric data reset successfully.');
+        } catch (err) {
+          alert('Failed to reset face data');
+        }
+      }
+    });
   };
 
-  const handleDeleteStudent = async (id) => {
-    if (!window.confirm('Permanently delete student and logs?')) return;
-    try {
-      await axios.delete(`/admin/students/${id}`);
-      fetchData();
-    } catch (err) {
-      alert('Failed to delete student');
-    }
+  const handleDeleteStudent = (id) => {
+    setConfirmDialog({
+      isOpen: true,
+      message: 'WARNING: Permanently delete this student and all of their attendance history? This cannot be undone.',
+      action: async () => {
+        try {
+          await axios.delete(`/admin/students/${id}`);
+          fetchData();
+          showToast('Student record permanently deleted.');
+        } catch (err) {
+          alert('Failed to delete student');
+        }
+      }
+    });
   };
 
   const handleAddStudent = async (e) => {
@@ -154,6 +193,7 @@ const AdminDashboard = ({ user }) => {
       setIsAddModalOpen(false);
       setNewStudent({ full_name: '', roll_number: '', college_email: '', branch: '', section: '', password: 'password123' });
       fetchData();
+      showToast('Student enrolled successfully!');
     } catch (err) {
       setAddError(err.response?.data?.message || 'Failed to add student');
     } finally {
@@ -308,13 +348,15 @@ const AdminDashboard = ({ user }) => {
               <UserPlus className="w-4 h-4" />
               Add Student
             </button>
-            <button 
-              onClick={handleDownloadReport}
-              className="p-2.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all border border-slate-100 shadow-sm"
-              title="Download Report"
-            >
-              <Download className="w-5 h-5" />
-            </button>
+            {(activeTab === 'attendance' || activeTab === 'roster') && (
+              <button 
+                onClick={handleDownloadReport}
+                className="p-2.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all border border-slate-100 shadow-sm"
+                title="Download Report"
+              >
+                <Download className="w-5 h-5" />
+              </button>
+            )}
           </div>
         </header>
 
@@ -384,11 +426,11 @@ const AdminDashboard = ({ user }) => {
                       <tr><td colSpan="4" className="p-20 text-center"><Loader className="w-10 h-10 animate-spin mx-auto text-primary-500 mb-4" /><p className="text-xs font-black text-slate-400 uppercase tracking-widest animate-pulse">Establishing Secure Sync...</p></td></tr>
                     ) : (activeTab === 'attendance' ? data : rosterData).length === 0 ? (
                       <tr><td colSpan="4" className="p-20 text-center text-slate-400 italic font-semibold">No records discovered for this timeframe.</td></tr>
-                    ) : (activeTab === 'attendance' ? data : rosterData).map((log, i) => (
+                    ) : (activeTab === 'attendance' ? data : rosterData).slice((currentPage - 1) * 50, currentPage * 50).map((log, i) => (
                       <tr key={i} className="hover:bg-slate-50/50 transition-colors group">
                         <td className="px-8 py-6">
                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center font-black text-slate-400 text-sm group-hover:bg-white group-hover:shadow-md transition-all uppercase">{log.full_name?.charAt(0) || '?'}</div>
+                              <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white text-sm group-hover:shadow-md transition-all uppercase" style={{ backgroundColor: stringToColor(log.full_name) }}>{log.full_name?.charAt(0) || '?'}</div>
                               <div>
                                  <p className="text-sm font-black text-slate-900 uppercase tracking-tight">{log.full_name}</p>
                                  <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider font-mono">{log.roll_number}</p>
@@ -422,6 +464,15 @@ const AdminDashboard = ({ user }) => {
                   </tbody>
                 </table>
               </div>
+              {((activeTab === 'attendance' ? data : rosterData).length > 50) && (
+                <div className="flex items-center justify-between mt-6 px-4">
+                   <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Showing {(currentPage - 1) * 50 + 1} - {Math.min(currentPage * 50, (activeTab === 'attendance' ? data : rosterData).length)} of {(activeTab === 'attendance' ? data : rosterData).length}</p>
+                   <div className="flex items-center gap-2">
+                     <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-all">Previous</button>
+                     <button disabled={currentPage * 50 >= (activeTab === 'attendance' ? data : rosterData).length} onClick={() => setCurrentPage(p => p + 1)} className="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-all">Next</button>
+                   </div>
+                </div>
+              )}
             </>
           )}
 
@@ -437,12 +488,21 @@ const AdminDashboard = ({ user }) => {
                             <input type="date" className="flex-1 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold font-mono outline-none" value={matrixRange.end} onChange={e => setMatrixRange({...matrixRange, end: e.target.value})} />
                          </div>
                       </div>
-                      <div className="w-48">
-                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Filter Core</label>
-                         <select className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold outline-none" value={filters.branch} onChange={e => setFilters({...filters, branch: e.target.value})}>
-                            <option value="">All Branches</option>
-                            {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
-                         </select>
+                      <div className="flex gap-4">
+                        <div className="w-40">
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Branch</label>
+                           <select className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold outline-none" value={filters.branch} onChange={e => setFilters({...filters, branch: e.target.value})}>
+                              <option value="">All Branches</option>
+                              {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                           </select>
+                        </div>
+                        <div className="w-40">
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Section</label>
+                           <select className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold outline-none" value={filters.section} onChange={e => setFilters({...filters, section: e.target.value})}>
+                              <option value="">All Sections</option>
+                              {SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                           </select>
+                        </div>
                       </div>
                       <div className="flex gap-3">
                         <button onClick={fetchMatrix} className="p-4 bg-slate-900 text-white rounded-2xl shadow-xl hover:bg-slate-800 transition-all"><Search className="w-5 h-5" /></button>
@@ -541,13 +601,22 @@ const AdminDashboard = ({ user }) => {
                   <tbody className="divide-y divide-slate-50">
                     {loading && students.length === 0 ? (
                       <tr><td colSpan="4" className="p-20 text-center animate-pulse text-slate-400 font-bold uppercase tracking-widest">Accessing Roster Vault...</td></tr>
-                    ) : students.map((student, i) => (
+                    ) : students.length === 0 ? (
+                      <tr><td colSpan="4" className="p-20 text-center text-slate-400 italic font-semibold">No students found matching these filters.</td></tr>
+                    ) : students.slice((currentPage - 1) * 50, currentPage * 50).map((student, i) => (
                       <tr key={i} className="hover:bg-slate-50/50 transition-colors group border-b border-slate-50">
                         <td className="px-8 py-6">
                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 bg-primary-50 text-primary-600 rounded-2xl flex items-center justify-center font-black text-sm group-hover:bg-white transition-all uppercase">{student.full_name?.charAt(0)}</div>
+                              <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white text-sm transition-all uppercase shadow-sm" style={{ backgroundColor: stringToColor(student.full_name) }}>{student.full_name?.charAt(0)}</div>
                               <div>
-                                 <p className="text-sm font-black text-slate-900 uppercase tracking-tight">{student.full_name}</p>
+                                 <p className="text-sm font-black text-slate-900 uppercase tracking-tight flex items-center gap-2">
+                                    {student.full_name}
+                                    {student.has_face_data ? (
+                                       <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" title="Face Enrolled"></span>
+                                    ) : (
+                                       <span className="w-2 h-2 rounded-full bg-slate-200" title="Face Not Enrolled"></span>
+                                    )}
+                                 </p>
                                  <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-widest font-mono">{student.roll_number}</p>
                               </div>
                            </div>
@@ -572,6 +641,15 @@ const AdminDashboard = ({ user }) => {
                   </tbody>
                 </table>
               </div>
+              {(students.length > 50) && (
+                <div className="flex items-center justify-between mt-6 px-4">
+                   <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Showing {(currentPage - 1) * 50 + 1} - {Math.min(currentPage * 50, students.length)} of {students.length}</p>
+                   <div className="flex items-center gap-2">
+                     <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-all">Previous</button>
+                     <button disabled={currentPage * 50 >= students.length} onClick={() => setCurrentPage(p => p + 1)} className="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-all">Next</button>
+                   </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -580,16 +658,35 @@ const AdminDashboard = ({ user }) => {
           {activeTab === 'health' && (
              <div className="mt-8 max-w-2xl mx-auto animate-fade-in">
                <div className="bg-white p-12 rounded-[2.5rem] border border-slate-100 shadow-sm text-center relative overflow-hidden">
-                 <div className="absolute top-0 left-0 w-full h-2 bg-green-500"></div>
-                 <Database className="w-20 h-20 text-green-500 mx-auto mb-6 drop-shadow-md" />
+                 <div className={`absolute top-0 left-0 w-full h-2 ${healthData?.database === 'connected' ? 'bg-green-500' : 'bg-amber-500'}`}></div>
+                 <Database className={`w-20 h-20 mx-auto mb-6 drop-shadow-md ${healthData?.database === 'connected' ? 'text-green-500' : 'text-amber-500'}`} />
                  <h2 className="text-3xl font-black text-slate-900 tracking-tight">System Health</h2>
-                 <div className="mt-4 inline-flex items-center gap-2 px-4 py-1 bg-green-50 text-green-600 rounded-full text-xs font-black uppercase tracking-widest border border-green-100">
-                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                    All Systems Operational
-                 </div>
-                 <p className="text-slate-500 mt-6 font-medium leading-relaxed">
-                    Database connections, biometric facial models, and active portal sessions are currently operating without any latency or connection drops.
-                 </p>
+                 
+                 {loading && !healthData ? (
+                   <p className="text-slate-400 mt-6 animate-pulse font-bold uppercase tracking-widest text-xs">Pinging core servers...</p>
+                 ) : (
+                   <>
+                     <div className={`mt-4 inline-flex items-center gap-2 px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest border ${healthData?.database === 'connected' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                        <div className={`w-2 h-2 rounded-full animate-pulse ${healthData?.database === 'connected' ? 'bg-green-500' : 'bg-amber-500'}`}></div>
+                        {healthData?.database === 'connected' ? 'Database Connected' : 'Database Offline'}
+                     </div>
+                     <p className="text-slate-500 mt-6 font-medium leading-relaxed">
+                        Database connections and biometric facial models are fully operational.
+                     </p>
+                     {healthData?.metrics && (
+                       <div className="mt-8 grid grid-cols-2 gap-4">
+                          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Logs Indexed</p>
+                             <p className="text-2xl font-black text-slate-900">{healthData.metrics.total_logs.toLocaleString()}</p>
+                          </div>
+                          <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Users Enrolled</p>
+                             <p className="text-2xl font-black text-slate-900">{healthData.metrics.total_users.toLocaleString()}</p>
+                          </div>
+                       </div>
+                     )}
+                   </>
+                 )}
                </div>
              </div>
           )}
@@ -626,7 +723,7 @@ const AdminDashboard = ({ user }) => {
                                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Time Left</p>
                                     <p className="text-3xl font-black text-slate-900 font-mono tabular-nums leading-none">
                                        {session.expires_at ? (() => {
-                                           const diff = new Date(session.expires_at) - (session.server_time ? new Date(session.server_time) : new Date());
+                                           const diff = new Date(session.expires_at) - now;
                                            if (diff <= 0) return '00:00';
                                            const m = Math.floor(diff / 60000);
                                            const s = Math.floor((diff % 60000) / 1000);
@@ -677,6 +774,33 @@ const AdminDashboard = ({ user }) => {
         </div>
       </div>
 
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-top-10 fade-in duration-300">
+          <div className="px-6 py-4 bg-slate-900 text-white rounded-2xl shadow-2xl shadow-slate-900/20 flex items-center gap-3 border border-slate-700">
+            <CheckCircle className="w-5 h-5 text-green-400" />
+            <p className="text-sm font-bold">{toast.message}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Dialog */}
+      {confirmDialog.isOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-sm w-full p-8 animate-in zoom-in-95 duration-200 text-center">
+             <div className="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                <AlertCircle className="w-8 h-8" />
+             </div>
+             <h3 className="text-xl font-black text-slate-900 mb-2">Are you sure?</h3>
+             <p className="text-slate-500 text-sm font-medium mb-8 leading-relaxed">{confirmDialog.message}</p>
+             <div className="flex gap-3">
+                <button onClick={() => setConfirmDialog({ isOpen: false, message: '', action: null })} className="flex-1 py-4 bg-slate-50 text-slate-600 font-bold rounded-2xl hover:bg-slate-100 transition-all">Cancel</button>
+                <button onClick={() => { confirmDialog.action(); setConfirmDialog({ isOpen: false, message: '', action: null }); }} className="flex-1 py-4 bg-red-500 text-white font-bold rounded-2xl hover:bg-red-600 shadow-lg shadow-red-500/20 transition-all">Confirm</button>
+             </div>
+          </div>
+        </div>
+      )}
+
       {/* Add Student Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-md animate-fade-in">
@@ -723,13 +847,18 @@ const AdminDashboard = ({ user }) => {
                       </select>
                     </div>
                  </div>
+
+                 <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Temporary Password</label>
+                    <input required type="text" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-primary-500/10 outline-none transition-all font-bold text-sm" placeholder="password123" value={newStudent.password} onChange={e => setNewStudent({...newStudent, password: e.target.value})} />
+                 </div>
               </div>
 
               {addError && <div className="p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600 text-[10px] font-black uppercase tracking-widest flex items-center gap-3"><AlertCircle className="w-5 h-5" />{addError}</div>}
 
               <button type="submit" disabled={addLoading} className="w-full py-5 bg-slate-900 hover:bg-black text-white font-black text-xs uppercase tracking-[0.3em] rounded-3xl shadow-2xl transition-all shadow-slate-200 flex items-center justify-center gap-4">
                 {addLoading ? <Loader className="w-6 h-6 animate-spin" /> : <UserPlus className="w-6 h-6" />}
-                {addLoading ? 'AUTHENTICATING...' : 'REGISTER STUDENT ENROLLMENT'}
+                {addLoading ? 'REGISTERING...' : 'REGISTER STUDENT ENROLLMENT'}
               </button>
             </form>
           </div>
