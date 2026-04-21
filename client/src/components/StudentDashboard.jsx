@@ -216,9 +216,9 @@ const StudentDashboard = ({ user }) => {
           </div>
         </div>
 
-        <div className="glass p-6 rounded-2xl shadow-lg border border-white/50 flex flex-col overflow-hidden">
+        <div className="glass p-6 rounded-2xl shadow-lg border border-white/50 flex flex-col">
           <h2 className="text-xl font-bold flex items-center gap-2 mb-4"><Calendar className="w-5 h-5 text-primary-600" /> Recent Logs</h2>
-          <div className="overflow-y-auto pr-2 custom-scrollbar space-y-3 h-[320px]">
+          <div className="overflow-y-auto pr-2 custom-scrollbar space-y-3 max-h-[350px]">
             {history.map((log) => (
               <div key={log.id} className="p-3.5 rounded-xl bg-white/60 border border-slate-100 flex items-center justify-between">
                 <div>
