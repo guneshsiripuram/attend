@@ -8,9 +8,12 @@ const pool = new Pool({
   }
 });
 
+
 pool.on('connect', () => {
   console.log('Connected to PostgreSQL database');
 });
+
+// Initialize database tables
 
 const query = (text, params) => {
   console.log('--- EXECUTING QUERY ---');
@@ -34,17 +37,19 @@ const initDB = async () => {
     // Ensure existing databases are updated
     await pool.query("ALTER TABLE portal_settings ADD COLUMN IF NOT EXISTS session_starts_at TIMESTAMP WITH TIME ZONE");
     
-    // Ensure one row exists
-    const check = await query('SELECT COUNT(*) FROM portal_settings');
-    if (parseInt(check.rows[0].count) === 0) {
-      await query('INSERT INTO portal_settings (is_open) VALUES (false)');
+    // Ensure we have exactly one settings record
+    const result = await pool.query("SELECT COUNT(*) FROM portal_settings");
+    if (result.rows[0].count === '0') {
+      await pool.query("INSERT INTO portal_settings (id, is_open) VALUES (1, FALSE)");
     }
-    
     console.log('Database initialized successfully: portal_settings table ready.');
   } catch (err) {
     console.error('Database initialization failed:', err);
   }
 };
+
+// Run init
+initDB();
 
 module.exports = {
   query,

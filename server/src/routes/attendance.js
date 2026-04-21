@@ -23,8 +23,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 // 1. New Endpoint: Check Location Only
 router.post('/check-location', authMiddleware, async (req, res) => {
   const { location } = req.body;
-  const userId = req.user.id;
-
+  
   if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') {
     return res.status(400).json({ success: false, message: 'Invalid or missing location data.' });
   }
@@ -36,18 +35,17 @@ router.post('/check-location', authMiddleware, async (req, res) => {
   const isInside = distance <= MAX_DISTANCE;
 
   if (!isInside) {
-    // Optional: Log failed location attempt
     return res.status(403).json({ 
       success: false, 
       message: 'LOCATION FAILED: You are out of campus range.',
-      details: `Distance: ${distance.toFixed(2)}m (Max: ${MAX_DISTANCE}m)`
+      details: `Distance: ${distance.toFixed(2)}m (Max allowed: ${MAX_DISTANCE}m)`
     });
   }
 
   return res.json({ success: true, message: 'Location verified.' });
 });
 
-// 2. Modified: Verify Attendance (Face only now, assuming location was checked)
+// 2. Verify Attendance (Face only now, assuming location was checked)
 router.post('/verify', authMiddleware, async (req, res) => {
   const { face_descriptor, location } = req.body; 
   const userId = req.user.id;
@@ -56,13 +54,13 @@ router.post('/verify', authMiddleware, async (req, res) => {
      // Session Check
      const sessionResult = await query('SELECT is_open, session_starts_at, expires_at FROM portal_settings WHERE id = 1');
      const session = sessionResult.rows[0];
-     if (!session || !session.is_open) return res.status(403).json({ message: 'Portal Closed.' });
+     if (!session || !session.is_open) return res.status(403).json({ message: 'Portal Closed: Faculty has not opened the attendance gate.' });
      
      const now = new Date();
-     if (session.session_starts_at && now < new Date(session.session_starts_at)) return res.status(403).json({ message: 'Portal Scheduled.' });
+     if (session.session_starts_at && now < new Date(session.session_starts_at)) return res.status(403).json({ message: 'Portal Scheduled: Opens at ' + new Date(session.session_starts_at).toLocaleTimeString() });
      if (session.expires_at && now > new Date(session.expires_at)) {
        await query('UPDATE portal_settings SET is_open = false WHERE id = 1');
-       return res.status(403).json({ message: 'Session Expired.' });
+       return res.status(403).json({ message: 'Session Expired: Gate closed automatically.' });
      }
 
      // Duplicate Check (IST)
@@ -79,15 +77,15 @@ router.post('/verify', authMiddleware, async (req, res) => {
      );
 
      if (existingLog && existingLog.rows.length > 0) {
-       return res.status(403).json({ message: `Duplicate Entry: Your ${currentSession} attendance is already recorded.` });
+       return res.status(403).json({ message: `Duplicate Entry: Your ${currentSession} attendance is already recorded for today.` });
      }
 
      // Fetch user data
      const userResult = await query('SELECT full_name, roll_number, section, face_embedding FROM users WHERE id = $1', [userId]);
      const user = userResult.rows[0];
-     if (!user) return res.status(404).json({ message: 'User not found' });
+     if (!user) return res.status(404).json({ message: 'User profile not found.' });
 
-     // Re-check location on final submit for security
+     // Final Location Security Check
      const campusLat = parseFloat(process.env.CAMPUS_LAT);
      const campusLng = parseFloat(process.env.CAMPUS_LNG);
      const distance = calculateDistance(location.lat, location.lng, campusLat, campusLng);
@@ -105,7 +103,7 @@ router.post('/verify', authMiddleware, async (req, res) => {
      if (typeof storedEmbedding === 'string') storedEmbedding = JSON.parse(storedEmbedding);
      const finalStored = Array.isArray(storedEmbedding) ? storedEmbedding : (storedEmbedding?.descriptor || storedEmbedding);
      
-     if (!finalStored) return res.status(400).json({ message: 'Face enrollment required.' });
+     if (!finalStored) return res.status(400).json({ message: 'Face enrollment required. Please register your face first.' });
 
      const { compareDescriptors } = require('../utils/faceUtils');
      const faceDistance = compareDescriptors(finalStored, face_descriptor);
@@ -117,7 +115,7 @@ router.post('/verify', authMiddleware, async (req, res) => {
           'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',
           [userId, user.roll_number, user.section, 'Failed_Face', JSON.stringify(location)]
         );
-        return res.status(403).json({ message: 'IDENTITY FAILED: Face match failed.', details: 'Ensure your face is well-lit and clearly visible.' });
+        return res.status(403).json({ message: 'IDENTITY FAILED: Face match failed.', details: 'Ensure you are in a well-lit area and looking directly at the camera.' });
      }
 
      // Success
@@ -131,8 +129,8 @@ router.post('/verify', authMiddleware, async (req, res) => {
        student: { name: user.full_name, rollNumber: user.roll_number }
      });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('[CRITICAL_ERROR]:', error);
+    res.status(500).json({ message: 'Server error during verification.' });
   }
 });
 
@@ -144,7 +142,7 @@ router.get('/me', authMiddleware, async (req, res) => {
       [req.user.id]
     );
     
-    // Calculate totalDays from ALL unique dates in the system activity
+    // FIX: Calculate totalDays from ALL unique dates in the system logs (IST)
     const dayCountResult = await query('SELECT COUNT(DISTINCT ("timestamp" AT TIME ZONE \'Asia/Kolkata\')::date) as count FROM attendance_logs');
     const totalDays = parseInt(dayCountResult.rows[0].count) || 1; 
 
@@ -160,12 +158,12 @@ router.get('/me', authMiddleware, async (req, res) => {
     });
 
     const presentDays = Object.values(statsByDate).filter(day => day.morning && day.afternoon).length;
-    const percentage = (presentDays / totalDays) * 100;
+    const percentage = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
 
     res.json({ logs: result.rows, stats: { percentage, present: presentDays, total: totalDays } });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Server error fetching history.' });
   }
 });
 
@@ -180,7 +178,7 @@ router.get('/session', authMiddleware, async (req, res) => {
     }
     res.json({ ...session, server_time: new Date() });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch session' });
+    res.status(500).json({ message: 'Failed to fetch session status.' });
   }
 });
 

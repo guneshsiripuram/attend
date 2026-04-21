@@ -29,18 +29,30 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
+    // 1. Allow internal requests (no origin)
     if (!origin) return callback(null, true);
     
-    // Normalize origins for comparison
-    const formattedOrigin = origin.replace(/\/$/, "");
-    const formattedAllowed = allowedOrigins.map(o => o.replace(/\/$/, ""));
+    // 2. Define known valid origins (including current frontend)
+    const validOrigins = [
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'https://stdatd.netlify.app',
+      'https://stdadt.netlify.app',
+      process.env.FRONTEND_URL
+    ].filter(Boolean);
 
-    if (formattedAllowed.indexOf(formattedOrigin) === -1) {
-      const msg = `CORS Error: Origin ${origin} not allowed. Approved: ${allowedOrigins.join(', ')}`;
-      console.error(msg);
-      return callback(new Error(msg), false);
+    // 3. Normalize for trailing slashes
+    const formattedOrigin = origin.replace(/\/$/, "");
+    const formattedAllowed = validOrigins.map(o => String(o).replace(/\/$/, ""));
+
+    // 4. Check for match
+    if (formattedAllowed.includes(formattedOrigin)) {
+      return callback(null, true);
     }
-    return callback(null, true);
+
+    // 5. Fallback: Log mismatch but don't crash (return false instead of Error)
+    console.error(`CORS Mismatch: ${origin} not in [${validOrigins.join(', ')}]`);
+    return callback(null, false);
   },
   credentials: true
 }));
@@ -74,3 +86,4 @@ app.use((req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+// Final check 

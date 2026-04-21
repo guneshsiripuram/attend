@@ -13,7 +13,11 @@ const StudentDashboard = ({ user }) => {
   // States
   const [isAutoMode, setIsAutoMode] = useState(true);
   const [isVerifying, setIsVerifying] = useState(false);
+<<<<<<< HEAD
   const [livenessStatus, setLivenessStatus] = useState('idle'); // idle, checking_location, challenge, success, failed
+=======
+  const [livenessStatus, setLivenessStatus] = useState('idle'); // idle, challenge, success, failed
+>>>>>>> ce8730cdbd6f32c9f3d32bd117e25d7758c34747
   const [blinkDetected, setBlinkDetected] = useState(false);
   const [result, setResult] = useState(null);
   const [history, setHistory] = useState([]);
@@ -79,11 +83,16 @@ const StudentDashboard = ({ user }) => {
   const isTrulyOpen = !!(session?.is_open && (!session.starts_at || new Date(session.starts_at) <= getServerNow()));
   const isScheduled = !!(!isTrulyOpen && session?.is_open && session.starts_at && new Date(session.starts_at) > getServerNow());
 
+<<<<<<< HEAD
   // Sequential Verification Flow
+=======
+  // 2. Liveness & Verification Flow
+>>>>>>> ce8730cdbd6f32c9f3d32bd117e25d7758c34747
   const handleVerify = async () => {
     if (isVerifying || livenessStatus === 'challenge' || !isTrulyOpen) return;
     
     setIsVerifying(true);
+<<<<<<< HEAD
     setResult(null);
     setBlinkDetected(false);
 
@@ -190,6 +199,96 @@ const StudentDashboard = ({ user }) => {
     }
   };
 
+=======
+    setLivenessStatus('challenge');
+    setBlinkDetected(false);
+    setResult(null);
+
+    const framesForLiveness = [];
+    const startLiveness = Date.now();
+    
+    // Blink Detection Loop
+    const livenessInterval = setInterval(async () => {
+      if (!webcamRef.current) return;
+      const frame = webcamRef.current.getScreenshot();
+      if (frame) {
+        const analysis = await FaceService.analyzeBase64(frame);
+        framesForLiveness.push(analysis);
+        if (framesForLiveness.length > 15) framesForLiveness.shift();
+
+        if (FaceService.detectBlinkSequence(framesForLiveness)) {
+          setBlinkDetected(true);
+          setLivenessStatus('success');
+          clearInterval(livenessInterval);
+          performBurstCapture();
+        }
+      }
+      
+      if (Date.now() - startLiveness > 15000) { // 15s timeout
+        clearInterval(livenessInterval);
+        if (livenessStatus !== 'success') {
+          setLivenessStatus('failed');
+          setResult({ success: false, message: 'Verification Timeout: Please blink naturally. (Ensure your face is well-lit and you are on-campus)' });
+          setIsVerifying(false);
+        }
+      }
+    }, 150);
+  };
+
+  const performBurstCapture = async () => {
+    const burstDescriptors = [];
+    for (let i = 0; i < 8; i++) {
+        if (!webcamRef.current) break;
+        const frame = webcamRef.current.getScreenshot();
+        if (frame) {
+            const analysis = await FaceService.analyzeBase64(frame);
+            if (analysis.isGood) burstDescriptors.push(analysis.descriptor);
+        }
+        if (burstDescriptors.length >= 5) break;
+        await new Promise(r => setTimeout(r, 150));
+    }
+
+    if (burstDescriptors.length < 3) {
+      setResult({ success: false, message: 'Bad image quality. Ensure your face is well-lit.' });
+      setIsVerifying(false);
+      setLivenessStatus('idle');
+      return;
+    }
+
+    // GPS & Submit
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          const response = await axios.post('/attendance/verify', {
+            face_descriptor: burstDescriptors,
+            location: loc
+          });
+          setResult({ success: true, ...response.data });
+          setLivenessStatus('idle');
+          fetchHistory();
+          checkSession();
+        } catch (err) {
+          setResult({ 
+            success: false, 
+            message: err.response?.data?.message || 'Verification failed. Please try again.',
+            details: err.response?.data?.details
+          });
+          setLivenessStatus('idle');
+        } finally {
+          setIsVerifying(false);
+        }
+      },
+      (err) => {
+        setResult({ success: false, message: 'Location required to mark attendance.' });
+        setIsVerifying(false);
+        setLivenessStatus('idle');
+      },
+      { timeout: 5000 }
+    );
+  };
+
+>>>>>>> ce8730cdbd6f32c9f3d32bd117e25d7758c34747
   // Auto-scanning loop
   useEffect(() => {
     if (isAutoMode && !result?.success && !isVerifying && isTrulyOpen) {
@@ -300,7 +399,15 @@ const StudentDashboard = ({ user }) => {
           {session.error && (
             <div className="flex items-center gap-3">
                <span className="text-[10px] font-bold text-red-500 uppercase">{session.errorMessage}</span>
+<<<<<<< HEAD
                <button onClick={checkSession} className="p-2 border border-slate-200 rounded-lg hover:bg-white transition-all"><RotateCcw className="w-3 h-3 text-slate-400" /></button>
+=======
+               {session.isExpired ? (
+                 <button onClick={() => navigate('/login')} className="px-3 py-1.5 bg-red-600 text-white text-[10px] font-black rounded-lg uppercase tracking-widest hover:bg-red-700 transition-all shadow-md">Login</button>
+               ) : (
+                 <button onClick={checkSession} className="p-2 border border-slate-200 rounded-lg hover:bg-white transition-all"><RotateCcw className="w-3 h-3 text-slate-400" /></button>
+               )}
+>>>>>>> ce8730cdbd6f32c9f3d32bd117e25d7758c34747
             </div>
           )}
         </div>
@@ -330,7 +437,11 @@ const StudentDashboard = ({ user }) => {
                {isAutoMode && isTrulyOpen && !result?.success ? (
                  <p className="flex items-center justify-center gap-2 animate-pulse text-primary-600">
                    <span className="w-1.5 h-1.5 bg-primary-600 rounded-full"></span>
+<<<<<<< HEAD
                    {livenessStatus === 'checking_location' ? 'Checking Location...' : (livenessStatus === 'challenge' ? 'Scanning Face...' : 'Awaiting Position...')}
+=======
+                   Scanning Face...
+>>>>>>> ce8730cdbd6f32c9f3d32bd117e25d7758c34747
                  </p>
                ) : (
                  <p>{result?.success ? `Verified: ${result.student?.name || 'Success'}` : 'Position your face in the frame'}</p>
@@ -339,7 +450,11 @@ const StudentDashboard = ({ user }) => {
            </div>
 
            {/* Webcam Box */}
+<<<<<<< HEAD
            <div className="relative w-full max-w-lg aspect-video bg-slate-950 rounded-[2rem] overflow-hidden shadow-2xl ring-4 ring-white/60 group">
+=======
+           <div className="relative w-full max-lg aspect-video bg-slate-950 rounded-[2rem] overflow-hidden shadow-2xl ring-4 ring-white/60 group">
+>>>>>>> ce8730cdbd6f32c9f3d32bd117e25d7758c34747
              <Webcam
                audio={false}
                ref={webcamRef}
@@ -371,6 +486,7 @@ const StudentDashboard = ({ user }) => {
                 </div>
              )}
 
+<<<<<<< HEAD
              {isVerifying && livenessStatus === 'checking_location' && (
                <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center z-30">
                  <div className="flex flex-col items-center gap-4">
@@ -381,6 +497,9 @@ const StudentDashboard = ({ user }) => {
              )}
 
              {(isVerifying && (livenessStatus === 'idle' || livenessStatus === 'success')) && (
+=======
+             {(isVerifying && livenessStatus === 'idle') && (
+>>>>>>> ce8730cdbd6f32c9f3d32bd117e25d7758c34747
                <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center z-30">
                  <Loader2 className="w-16 h-16 text-white animate-spin" />
                </div>
@@ -437,7 +556,11 @@ const StudentDashboard = ({ user }) => {
              </button>
 
              {result?.success && (
+<<<<<<< HEAD
                <button onClick={() => { setResult(null); setIsAutoMode(true); }} className="mx-auto block text-primary-600 text-xs font-black uppercase tracking-widest hover:text-primary-800 transition-colors">
+=======
+               <button onClick={() => { setResult(null); setIsAutoMode(true); }} className="w-full text-center text-primary-600 text-xs font-black uppercase tracking-widest hover:text-primary-800 transition-colors">
+>>>>>>> ce8730cdbd6f32c9f3d32bd117e25d7758c34747
                  Scan Another Session
                </button>
              )}

@@ -16,7 +16,40 @@ const App = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+
+  const login = (userData, token) => {
+    setUser(userData);
+    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('token', token);
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  };
+
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    delete axios.defaults.headers.common['Authorization'];
+  };
+
   useEffect(() => {
+    // Add axios response interceptor to handle 401/403 globally
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+          // If the error is exactly 403 from the /attendance/verify endpoint, pass it to the UI instead of logging out
+          if (error.response.status === 403 && error.config?.url?.includes('/verify')) {
+            return Promise.reject(error);
+          }
+          
+          console.warn('Authentication failed (401/403). Logging out...');
+          logout();
+          window.location.href = '/login';
+        }
+        return Promise.reject(error);
+      }
+    );
+
     console.log('App mounting, checking auth status...');
     // Check if user is already logged in
     const storedUser = localStorage.getItem('user');
@@ -30,7 +63,7 @@ const App = () => {
           setUser(parsedUser);
           axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
         } else {
-          throw new Error('Invalid user object in storage');
+          throw new Error('Invalid user storage format');
         }
       } catch (err) {
         console.error('Session restoration failed:', err);
@@ -38,25 +71,13 @@ const App = () => {
         localStorage.removeItem('token');
         setUser(null);
       }
+    } else {
+      console.log('No stored session found');
     }
     setLoading(false);
+
+    return () => axios.interceptors.response.eject(interceptor);
   }, []);
-
-  const login = (userData, token) => {
-    setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
-    localStorage.setItem('token', token);
-    
-    // Set axios header immediately
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  };
-
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
-    delete axios.defaults.headers.common['Authorization'];
-  };
 
   if (loading) return <div className="flex h-screen items-center justify-center">Loading...</div>;
 
