@@ -88,6 +88,7 @@ const StudentDashboard = ({ user }) => {
 
     if (burstDescriptors.length < 3) {
       setResult({ success: false, message: 'IDENTITY FAILED: Poor image quality.' });
+      setIsAutoMode(false);
       setIsVerifying(false);
       setLivenessStatus('idle');
       return;
@@ -104,6 +105,7 @@ const StudentDashboard = ({ user }) => {
       checkSession();
     } catch (err) {
       setResult({ success: false, message: err.response?.data?.message || 'Verification failed.' });
+      setIsAutoMode(false);
       setLivenessStatus('idle');
     } finally {
       setIsVerifying(false);
@@ -131,6 +133,7 @@ const StudentDashboard = ({ user }) => {
           setLivenessStatus('success');
           clearInterval(livenessInterval);
           performFinalSubmit(loc);
+          return;
         }
       }
       if (Date.now() - startLivenessTime > 15000) {
@@ -138,6 +141,7 @@ const StudentDashboard = ({ user }) => {
         if (!isBlinkSuccessful.current) { // Fix: Check ref instead of stale state
           setLivenessStatus('idle');
           setResult({ success: false, message: 'IDENTITY FAILED: Blink timeout.' });
+          setIsAutoMode(false);
           setIsVerifying(false);
         }
       }
@@ -161,12 +165,14 @@ const StudentDashboard = ({ user }) => {
           }
         } catch (err) {
           setResult({ success: false, message: err.response?.data?.message || 'LOCATION FAILED' });
+          setIsAutoMode(false);
           setLivenessStatus('idle');
           setIsVerifying(false);
         }
       },
       (err) => {
         setResult({ success: false, message: 'LOCATION FAILED: GPS required.' });
+        setIsAutoMode(false);
         setLivenessStatus('idle');
         setIsVerifying(false);
       },

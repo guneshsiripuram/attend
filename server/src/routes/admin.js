@@ -215,14 +215,14 @@ router.get('/attendance/history', authMiddleware, adminMiddleware, async (req, r
           'branch', branch
         ) ORDER BY timestamp DESC) as present_records
       FROM (
-        SELECT DISTINCT ON (al.user_id, (al.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date)
+        SELECT DISTINCT ON (al.user_id, (al.timestamp AT TIME ZONE 'Asia/Kolkata')::date)
           al.id, al.timestamp, al.status, al.user_id,
           u.full_name, u.roll_number, u.college_email, u.section, u.branch,
-          (al.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date as date
+          (al.timestamp AT TIME ZONE 'Asia/Kolkata')::date as date
         FROM attendance_logs al
         JOIN users u ON al.user_id = u.id
         WHERE al.status = 'Present'
-        ORDER BY al.user_id, (al.timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date, al.timestamp DESC
+        ORDER BY al.user_id, (al.timestamp AT TIME ZONE 'Asia/Kolkata')::date, al.timestamp DESC
       ) unique_logs
       GROUP BY date
       ORDER BY date DESC
@@ -333,14 +333,14 @@ router.get('/attendance/matrix', authMiddleware, adminMiddleware, async (req, re
     let logsQ = `
       SELECT 
         user_id, 
-        (timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date as date,
-        EXTRACT(HOUR FROM timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata') as hour
+        (timestamp AT TIME ZONE 'Asia/Kolkata')::date as date,
+        EXTRACT(HOUR FROM timestamp AT TIME ZONE 'Asia/Kolkata') as hour
       FROM attendance_logs 
       WHERE status = 'Present'
     `;
     const logsParams = [];
-    if (startDate) { logsParams.push(startDate); logsQ += ` AND (timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date >= $${logsParams.length}`; }
-    if (endDate) { logsParams.push(endDate); logsQ += ` AND (timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Kolkata')::date <= $${logsParams.length}`; }
+    if (startDate) { logsParams.push(startDate); logsQ += ` AND (timestamp AT TIME ZONE 'Asia/Kolkata')::date >= $${logsParams.length}`; }
+    if (endDate) { logsParams.push(endDate); logsQ += ` AND (timestamp AT TIME ZONE 'Asia/Kolkata')::date <= $${logsParams.length}`; }
     const logsResult = await query(logsQ, logsParams);
 
     // 3. Process Matrix
