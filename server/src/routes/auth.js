@@ -183,7 +183,7 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const result = awai t query('SELECT * FROM users WHERE college_email = $1', [email]);
+    const result = await query('SELECT * FROM users WHERE college_email = $1', [email]);
     if (result.rows.length === 0) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
