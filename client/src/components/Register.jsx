@@ -65,7 +65,7 @@ const Register = () => {
       const frame = webcamRef.current.getScreenshot();
       if (frame) {
         try {
-          const analysis = await FaceService.analyzeBase64(frame);
+          const analysis = await FaceService.analyzeBase64(frame, { isEnrollment: true });
           if (!analysis.isGood) {
             setError(`Step ${enrollmentStep + 1} Failed: ${analysis.reason}`);
             setIsRecording(false);

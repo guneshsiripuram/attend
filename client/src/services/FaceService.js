@@ -49,7 +49,7 @@ class FaceService {
     return this.loadingPromise;
   }
 
-  async analyzeBase64(base64Image) {
+  async analyzeBase64(base64Image, options = { isEnrollment: false }) {
     if (!base64Image) return { isGood: false, reason: 'Empty image' };
     if (!this.modelsLoaded) await this.loadModels();
     
@@ -61,8 +61,12 @@ class FaceService {
         img.onerror = () => reject(new Error('Image decode failed'));
       });
 
+      const detectionOptions = options.isEnrollment 
+        ? new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }) 
+        : DETECTION_OPTIONS;
+
       const detection = await faceapi
-        .detectSingleFace(img, DETECTION_OPTIONS)
+        .detectSingleFace(img, detectionOptions)
         .withFaceLandmarks()
         .withFaceDescriptor();
 
