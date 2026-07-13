@@ -62,7 +62,7 @@ class FaceService {
       });
 
       const detectionOptions = options.isEnrollment 
-        ? new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }) 
+        ? new faceapi.SsdMobilenetv1Options({ minConfidence: 0.25 }) 
         : DETECTION_OPTIONS;
 
       const detection = await faceapi
@@ -70,7 +70,7 @@ class FaceService {
         .withFaceLandmarks()
         .withFaceDescriptor();
 
-      if (!detection) return { isGood: false, reason: 'No face detected' };
+      if (!detection) return { isGood: false, reason: 'No face detected. Please face the light source (avoid bright backgrounds).' };
 
       // Optional: Add quality checks here if needed
       return {
