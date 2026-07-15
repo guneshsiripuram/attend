@@ -45,7 +45,9 @@ const AdminDashboard = ({ user }) => {
     password: 'password123'
   });
   
-  const [session, setSession] = useState({ is_open: false, starts_at: null, expires_at: null, server_time: null });
+  const [session, setSession] = useState({ is_open: false, starts_at: null, expires_at: null, server_time: null, campus_lat: '', campus_lng: '', max_distance_meters: '' });
+  const [locSettings, setLocSettings] = useState({ lat: '', lng: '', radius: '' });
+  const [locLoading, setLocLoading] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(false);
   const [scheduleStart, setScheduleStart] = useState('');
   const [scheduleEnd, setScheduleEnd] = useState('');
@@ -54,6 +56,11 @@ const AdminDashboard = ({ user }) => {
     try {
       const resp = await axios.get('/admin/session');
       setSession(resp.data);
+      setLocSettings({
+        lat: resp.data.campus_lat || '',
+        lng: resp.data.campus_lng || '',
+        radius: resp.data.max_distance_meters || ''
+      });
     } catch (err) {
       console.error('Failed to fetch session', err);
       setSession(prev => ({ ...prev, error: true }));
@@ -144,11 +151,25 @@ const AdminDashboard = ({ user }) => {
         setScheduleStart('');
         setScheduleEnd('');
       }
+      showToast(!session.is_open ? 'Gate opened successfully' : 'Gate closed');
     } catch (err) {
       const errorMsg = err.response?.data?.error || err.response?.data?.message || err.message;
       alert(`Failed to update session: ${errorMsg}`);
     } finally {
       setSessionLoading(false);
+    }
+  };
+
+  const handleUpdateLocation = async () => {
+    setLocLoading(true);
+    try {
+      await axios.post('/admin/session/location', locSettings);
+      showToast('Geolocation settings updated successfully!');
+      fetchSession();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Error updating location');
+    } finally {
+      setLocLoading(false);
     }
   };
 

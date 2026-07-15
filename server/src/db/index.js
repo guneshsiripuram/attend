@@ -30,12 +30,18 @@ const initDB = async () => {
         is_open BOOLEAN DEFAULT FALSE,
         session_starts_at TIMESTAMP WITH TIME ZONE,
         expires_at TIMESTAMP WITH TIME ZONE,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        campus_lat DECIMAL(10, 8),
+        campus_lng DECIMAL(11, 8),
+        max_distance_meters INTEGER DEFAULT 200
       );
     `);
     
     // Ensure existing databases are updated
     await pool.query("ALTER TABLE portal_settings ADD COLUMN IF NOT EXISTS session_starts_at TIMESTAMP WITH TIME ZONE");
+    await pool.query("ALTER TABLE portal_settings ADD COLUMN IF NOT EXISTS campus_lat DECIMAL(10, 8) DEFAULT 17.8340");
+    await pool.query("ALTER TABLE portal_settings ADD COLUMN IF NOT EXISTS campus_lng DECIMAL(11, 8) DEFAULT 83.3768");
+    await pool.query("ALTER TABLE portal_settings ADD COLUMN IF NOT EXISTS max_distance_meters INTEGER DEFAULT 200");
     
     // Ensure we have exactly one settings record
     const result = await pool.query("SELECT COUNT(*) FROM portal_settings");

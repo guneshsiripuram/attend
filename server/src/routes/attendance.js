@@ -28,10 +28,13 @@ router.post('/check-location', authMiddleware, async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid or missing location data.' });
   }
 
-  const campusLat = parseFloat(process.env.CAMPUS_LAT);
-  const campusLng = parseFloat(process.env.CAMPUS_LNG);
+  const sessionResult = await query('SELECT campus_lat, campus_lng, max_distance_meters FROM portal_settings WHERE id = 1');
+  const session = sessionResult.rows[0];
+  
+  const campusLat = parseFloat(session?.campus_lat || process.env.CAMPUS_LAT);
+  const campusLng = parseFloat(session?.campus_lng || process.env.CAMPUS_LNG);
   const distance = calculateDistance(location.lat, location.lng, campusLat, campusLng);
-  const MAX_DISTANCE = parseFloat(process.env.MAX_DISTANCE_METERS || '200');
+  const MAX_DISTANCE = parseInt(session?.max_distance_meters || process.env.MAX_DISTANCE_METERS || '200');
   const isInside = distance <= MAX_DISTANCE;
 
   if (!isInside) {
@@ -52,7 +55,7 @@ router.post('/verify', authMiddleware, async (req, res) => {
 
   try {
      // Session Check
-     const sessionResult = await query('SELECT is_open, session_starts_at, expires_at FROM portal_settings WHERE id = 1');
+     const sessionResult = await query('SELECT is_open, session_starts_at, expires_at, campus_lat, campus_lng, max_distance_meters FROM portal_settings WHERE id = 1');
      const session = sessionResult.rows[0];
      if (!session || !session.is_open) return res.status(403).json({ message: 'Portal Closed: Faculty has not opened the attendance gate.' });
      
@@ -86,10 +89,10 @@ router.post('/verify', authMiddleware, async (req, res) => {
      if (!user) return res.status(404).json({ message: 'User profile not found.' });
 
      // Final Location Security Check
-     const campusLat = parseFloat(process.env.CAMPUS_LAT);
-     const campusLng = parseFloat(process.env.CAMPUS_LNG);
+     const campusLat = parseFloat(session?.campus_lat || process.env.CAMPUS_LAT);
+     const campusLng = parseFloat(session?.campus_lng || process.env.CAMPUS_LNG);
      const distance = calculateDistance(location.lat, location.lng, campusLat, campusLng);
-     const MAX_DISTANCE = parseFloat(process.env.MAX_DISTANCE_METERS || '200');
+     const MAX_DISTANCE = parseInt(session?.max_distance_meters || process.env.MAX_DISTANCE_METERS || '200');
      if (distance > MAX_DISTANCE) {
         await query(
           'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',

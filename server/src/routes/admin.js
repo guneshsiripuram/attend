@@ -246,7 +246,7 @@ router.get('/attendance/history', authMiddleware, adminMiddleware, async (req, r
 // Session Gate Controls (GET allowed for all auth users, POST for admins only)
 router.get('/session', authMiddleware, async (req, res) => {
   try {
-    const result = await query('SELECT is_open, session_starts_at as starts_at, expires_at FROM portal_settings WHERE id = 1');
+    const result = await query('SELECT is_open, session_starts_at as starts_at, expires_at, campus_lat, campus_lng, max_distance_meters FROM portal_settings WHERE id = 1');
     let session = result.rows[0];
 
     // Auto-expiration check in GET route to prevent desync
@@ -264,6 +264,21 @@ router.get('/session', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('Session fetch error:', err);
     res.status(500).json({ message: 'Failed to fetch session' });
+  }
+});
+
+// Update Location Settings
+router.post('/session/location', authMiddleware, adminMiddleware, async (req, res) => {
+  const { lat, lng, radius } = req.body;
+  try {
+    await query(
+      "UPDATE portal_settings SET campus_lat = $1, campus_lng = $2, max_distance_meters = $3, updated_at = CURRENT_TIMESTAMP WHERE id = 1",
+      [lat, lng, radius]
+    );
+    res.json({ message: 'Geolocation settings updated successfully' });
+  } catch (error) {
+    console.error('LOCATION_UPDATE_ERROR:', error);
+    res.status(500).json({ message: 'Error updating geolocation settings' });
   }
 });
 

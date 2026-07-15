@@ -12,7 +12,7 @@ const adminRoutes = require('./routes/admin');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'COLLEGE_DOMAIN', 'CAMPUS_LAT', 'CAMPUS_LNG', 'MAX_DISTANCE_METERS', 'GOOGLE_CLIENT_ID'];
+const REQUIRED_ENV = ['DATABASE_URL', 'JWT_SECRET', 'COLLEGE_DOMAIN', 'GOOGLE_CLIENT_ID'];
 
 const missingEnv = REQUIRED_ENV.filter(env => !process.env[env]);
 if (missingEnv.length > 0) {
