@@ -794,7 +794,42 @@ const AdminDashboard = ({ user }) => {
                       </div>
                    </div>
                 </div>
-             </div>
+
+                 {/* Geolocation Settings Card */}
+                 <div className="mt-8 bg-white p-12 rounded-[3.5rem] shadow-2xl border border-slate-100 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50 rounded-full blur-[100px] -mr-32 -mt-32 opacity-60"></div>
+                    <div className="relative z-10 flex flex-col md:flex-row items-start gap-16">
+                       <div className="flex-1 space-y-8 w-full">
+                          <div className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-2xl shadow-xl shadow-blue-200">
+                            <MapPin className="w-5 h-5 flex-shrink-0" />
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Geolocation Config</span>
+                          </div>
+                          <h2 className="text-4xl font-black text-slate-900 leading-[1.1] tracking-tighter">Campus Boundaries</h2>
+                          <p className="text-slate-500 text-sm font-medium leading-relaxed">
+                             Define the GPS coordinates and maximum allowed distance (radius) for student attendance.
+                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                            <div className="space-y-2">
+                               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Latitude</label>
+                               <input type="number" step="any" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-mono font-bold text-slate-700" value={locSettings.lat} onChange={(e) => setLocSettings({...locSettings, lat: e.target.value})} placeholder="e.g. 17.8340" />
+                            </div>
+                            <div className="space-y-2">
+                               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Longitude</label>
+                               <input type="number" step="any" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-mono font-bold text-slate-700" value={locSettings.lng} onChange={(e) => setLocSettings({...locSettings, lng: e.target.value})} placeholder="e.g. 83.3768" />
+                            </div>
+                            <div className="space-y-2 md:col-span-2">
+                               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Max Distance Radius (Meters)</label>
+                               <input type="number" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-mono font-bold text-slate-700" value={locSettings.radius} onChange={(e) => setLocSettings({...locSettings, radius: e.target.value})} placeholder="e.g. 200" />
+                            </div>
+                          </div>
+                          <button onClick={handleUpdateLocation} disabled={locLoading} className="w-full py-5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl shadow-xl shadow-blue-200 transition-all flex items-center justify-center gap-3">
+                             {locLoading ? <Loader className="w-5 h-5 animate-spin" /> : <Database className="w-5 h-5" />}
+                             <span className="text-sm uppercase tracking-widest">Update Boundaries</span>
+                          </button>
+                       </div>
+                    </div>
+                 </div>
+              </div>
           )}
         </div>
       </div>
