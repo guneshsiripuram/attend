@@ -20,6 +20,10 @@ const StudentDashboard = ({ user }) => {
   const [cameraError, setCameraError] = useState('');
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [isModelsLoaded, setIsModelsLoaded] = useState(false);
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [modelProgress, setModelProgress] = useState(0);
+  const [modelLoadError, setModelLoadError] = useState('');
+  const [gpsError, setGpsError] = useState('');
   
   const [session, setSession] = useState({ is_open: false, expires_at: null, starts_at: null, server_time: null });
   const [isSessionLoading, setIsSessionLoading] = useState(true);
@@ -63,11 +67,18 @@ const StudentDashboard = ({ user }) => {
   }, []);
 
   useEffect(() => {
-    FaceService.loadModels().then(() => setIsModelsLoaded(true));
+    FaceService.onProgress = (p) => setModelProgress(Math.round(p * 100));
+    FaceService.loadModels()
+      .then(() => setIsModelsLoaded(true))
+      .catch(() => setModelLoadError('Face recognition models failed to load. Check your internet connection and refresh the page.'))
+      .finally(() => setModelsLoading(false));
     checkSession();
     fetchHistory();
     const interval = setInterval(checkSession, 10000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      FaceService.onProgress = null;
+    };
   }, [fetchHistory]);
 
   const getServerNow = useCallback(() => new Date(Date.now() + serverTimeOffset), [serverTimeOffset]);
@@ -153,6 +164,7 @@ const StudentDashboard = ({ user }) => {
     setIsVerifying(true);
     setResult(null);
     setBlinkDetected(false);
+    setGpsError('');
     setLivenessStatus('checking_location');
 
     navigator.geolocation.getCurrentPosition(
@@ -164,19 +176,24 @@ const StudentDashboard = ({ user }) => {
             startLivenessChallenge(loc);
           }
         } catch (err) {
-          setResult({ success: false, message: err.response?.data?.message || 'LOCATION FAILED' });
+          setGpsError(err.response?.data?.message || 'LOCATION FAILED');
           setIsAutoMode(false);
           setLivenessStatus('idle');
           setIsVerifying(false);
         }
       },
       (err) => {
-        setResult({ success: false, message: 'LOCATION FAILED: GPS required.' });
+        const code = err && err.code;
+        let message = 'LOCATION FAILED: GPS required.';
+        if (code === 1) message = 'LOCATION FAILED: Location permission was denied. Enable location access for this site in your browser settings, then retry.';
+        else if (code === 2) message = 'LOCATION FAILED: Position unavailable. Move to an area with better GPS signal and retry.';
+        else if (code === 3) message = 'LOCATION FAILED: GPS timed out. Try again with a stronger GPS signal.';
+        setGpsError(message);
         setIsAutoMode(false);
         setLivenessStatus('idle');
         setIsVerifying(false);
       },
-      { timeout: 8000 }
+      { timeout: 8000, maximumAge: 0, enableHighAccuracy: true }
     );
   }, [isVerifying, livenessStatus, isTrulyOpen, startLivenessChallenge]);
 
@@ -286,11 +303,32 @@ const StudentDashboard = ({ user }) => {
            </div>
            <div className="relative w-full max-w-lg aspect-video bg-slate-950 rounded-[2rem] overflow-hidden shadow-2xl ring-4 ring-white/60">
              <Webcam audio={false} ref={webcamRef} screenshotFormat="image/jpeg" className="w-full h-full object-cover" onUserMedia={() => setIsCameraReady(true)} />
+             {modelsLoading && (
+               <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm flex flex-col items-center justify-center gap-4 z-10">
+                 <Loader2 className="w-10 h-10 text-primary-400 animate-spin" />
+                 <p className="text-white text-xs font-black uppercase tracking-widest text-center px-6">Loading Face Recognition Models</p>
+                 <div className="w-48 h-2 bg-slate-700 rounded-full overflow-hidden">
+                   <div className="h-full bg-primary-500 transition-all duration-300" style={{ width: `${modelProgress}%` }}></div>
+                 </div>
+                 <p className="text-slate-400 text-[10px] font-bold">{modelProgress}% — first load can take a minute</p>
+               </div>
+             )}
+             {modelLoadError && (
+               <div className="absolute inset-x-4 bottom-4 bg-red-950/90 text-red-200 text-xs font-semibold p-3 rounded-xl z-10 text-center">{modelLoadError}</div>
+             )}
              {isVerifying && livenessStatus === 'challenge' && <div className="absolute inset-x-0 bottom-0 bg-slate-900/80 py-6 text-center text-white font-black text-2xl uppercase animate-pulse">Blink Now!</div>}
              {isVerifying && (livenessStatus === 'checking_location' || livenessStatus === 'success') && <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center"><Loader2 className="w-16 h-16 text-white animate-spin" /></div>}
            </div>
            <div className="w-full max-w-lg space-y-6">
              {result && <div className={`p-5 rounded-2xl border-2 ${result.success ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}><p className="text-lg font-black">{result.message}</p></div>}
+             {gpsError && (
+               <div className="p-5 rounded-2xl border-2 bg-amber-50 border-amber-200 text-amber-900">
+                 <p className="text-sm font-black">{gpsError}</p>
+                 <button onClick={handleVerify} disabled={isVerifying || !isTrulyOpen} className="mt-4 w-full py-3 rounded-2xl bg-amber-500 text-white font-black uppercase text-xs hover:bg-amber-600 disabled:opacity-50 transition-all">
+                   Retry Location Check
+                 </button>
+               </div>
+             )}
              <button onClick={handleVerify} disabled={isVerifying || result?.success || !isTrulyOpen} className={`w-full py-6 rounded-3xl font-black uppercase text-sm ${isVerifying || result?.success || !isTrulyOpen ? 'bg-slate-200 text-slate-400' : 'bg-primary-600 text-white shadow-xl shadow-primary-200'}`}>
                {isVerifying ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : (result?.success ? 'Marked' : 'Confirm Attendance')}
              </button>

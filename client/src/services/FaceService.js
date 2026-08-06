@@ -21,6 +21,8 @@ class FaceService {
     this.modelsLoaded = false;
     this.modelsLoading = false;
     this.loadingPromise = null;
+    this.loadProgress = 0;
+    this.onProgress = null;
   }
 
   async loadModels() {
@@ -28,13 +30,16 @@ class FaceService {
     if (this.modelsLoading && this.loadingPromise) return this.loadingPromise;
 
     this.modelsLoading = true;
+    this.loadProgress = 0.05;
     this.loadingPromise = (async () => {
       try {
-        await Promise.all([
-          faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
-          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
-        ]);
+        // Load sequentially so the UI can show meaningful progress.
+        await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
+        this.setProgress(0.4);
+        await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+        this.setProgress(0.7);
+        await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+        this.setProgress(1);
         this.modelsLoaded = true;
         return true;
       } catch (error) {
@@ -47,6 +52,13 @@ class FaceService {
     })();
 
     return this.loadingPromise;
+  }
+
+  setProgress(value) {
+    this.loadProgress = value;
+    if (typeof this.onProgress === 'function') {
+      this.onProgress(value);
+    }
   }
 
   async analyzeBase64(base64Image, options = { isEnrollment: false }) {

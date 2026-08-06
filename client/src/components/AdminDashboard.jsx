@@ -4,6 +4,19 @@ import { Search, Filter, Download, Users, CheckCircle, Clock, AlertCircle, Shiel
 import AttendanceHistory from './AttendanceHistory';
 import { BRANCHES, SECTIONS } from '../constants';
 
+// Cryptographically-strong default password for admin-created student accounts.
+const generatePassword = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%&*';
+  const array = new Uint32Array(12);
+  crypto.getRandomValues(array);
+  let password = '';
+  for (let i = 0; i < 12; i++) password += chars[array[i] % chars.length];
+  // Guarantee the password passes server strength checks (letter + number).
+  if (!/\d/.test(password)) password = password.slice(0, -1) + '7';
+  if (!/[A-Za-z]/.test(password)) password = password.slice(0, -1) + 'a';
+  return password;
+};
+
 const AdminDashboard = ({ user }) => {
   const [data, setData] = useState([]);
   const [students, setStudents] = useState([]);
@@ -42,7 +55,7 @@ const AdminDashboard = ({ user }) => {
     college_email: '',
     branch: '',
     section: '',
-    password: 'password123'
+    password: ''
   });
   
   const [session, setSession] = useState({ is_open: false, starts_at: null, expires_at: null, server_time: null, campus_lat: '', campus_lng: '', max_distance_meters: '' });
@@ -212,7 +225,7 @@ const AdminDashboard = ({ user }) => {
     try {
       await axios.post('/auth/register', { ...newStudent, role: 'student' });
       setIsAddModalOpen(false);
-      setNewStudent({ full_name: '', roll_number: '', college_email: '', branch: '', section: '', password: 'password123' });
+      setNewStudent({ full_name: '', roll_number: '', college_email: '', branch: '', section: '', password: generatePassword() });
       fetchData();
       showToast('Student enrolled successfully!');
     } catch (err) {
@@ -363,7 +376,10 @@ const AdminDashboard = ({ user }) => {
             </div>
             
             <button 
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={() => {
+                setNewStudent(prev => ({ ...prev, password: prev.password || generatePassword() }));
+                setIsAddModalOpen(true);
+              }}
               className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-slate-800 transition-all transform active:scale-95"
             >
               <UserPlus className="w-4 h-4" />
@@ -910,7 +926,8 @@ const AdminDashboard = ({ user }) => {
 
                  <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Temporary Password</label>
-                    <input required type="text" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-primary-500/10 outline-none transition-all font-bold text-sm" placeholder="password123" value={newStudent.password} onChange={e => setNewStudent({...newStudent, password: e.target.value})} />
+                    <input required type="text" className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-primary-500/10 outline-none transition-all font-bold text-sm" placeholder="Auto-generated secure password" value={newStudent.password} onChange={e => setNewStudent({...newStudent, password: e.target.value})} />
+                    <p className="text-[10px] font-semibold text-slate-400 ml-1">Auto-generated. Share it with the student securely — they should change it after first login.</p>
                  </div>
               </div>
 

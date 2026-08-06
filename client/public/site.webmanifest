@@ -1,0 +1,17 @@
+{
+  "name": "Raghu Attendance Portal",
+  "short_name": "Attendance",
+  "description": "Secure college attendance with biometric face verification.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0284c7",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
