@@ -5,7 +5,8 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false
-  }
+  },
+  options: '-c timezone=Asia/Kolkata'
 });
 
 pool.on('error', (err) => {
