@@ -118,8 +118,10 @@ class FaceService {
     const iw = img.width, ih = img.height;
     if (!iw || !ih) return ['Frame unavailable'];
 
-    const box = detection.box;
-    if (detection.score < QUALITY_THRESHOLDS.minConfidence) reasons.push('low confidence');
+    const box = (detection.detection || detection).box;
+    if (!box) return ['frame analysis unavailable'];
+    const faceDetection = detection.detection || detection;
+    if (faceDetection.score < QUALITY_THRESHOLDS.minConfidence) reasons.push('low confidence');
     if (box.width / iw < QUALITY_THRESHOLDS.minFaceWidthRatio) reasons.push('face too small');
     if (box.height / ih < QUALITY_THRESHOLDS.minFaceHeightRatio) reasons.push('face too small');
 
