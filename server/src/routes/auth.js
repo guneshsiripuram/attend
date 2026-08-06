@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-const { compareDescriptors } = require('../utils/faceUtils');
+const { compareDescriptors, isValidDescriptor, FACE_DISTANCE_THRESHOLD } = require('../utils/faceUtils');
 
 const router = express.Router();
 
@@ -153,24 +153,27 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'Face enrollment is required for students. Please record a short video.' });
     }
 
+    if (finalEmbedding && !isValidDescriptor(finalEmbedding)) {
+      return res.status(400).json({ message: 'Face enrollment is invalid (missing or corrupt data). Please record a clear, well-lit video.' });
+    }
+
     // STRICT BIOMETRIC DEDUPLICATION
     if (finalEmbedding) {
       console.log('Scanning face against global database for duplicates...');
       const allUsersResult = await query('SELECT id, roll_number, face_embedding FROM users WHERE face_embedding IS NOT NULL AND role = $1', ['student']);
-      const threshold = 0.58; // Exact same severity as the attendance gate
 
       for (const existingUser of allUsersResult.rows) {
         let storedEmbedding = existingUser.face_embedding;
         if (typeof storedEmbedding === 'string') {
           try { storedEmbedding = JSON.parse(storedEmbedding); } catch (e) { }
         }
-        if (!storedEmbedding) continue;
+        if (Array.isArray(storedEmbedding?.descriptor)) storedEmbedding = storedEmbedding.descriptor;
+        if (!isValidDescriptor(storedEmbedding)) continue;
 
         const faceDistance = compareDescriptors(storedEmbedding, finalEmbedding);
-        const similarity = 1 - faceDistance;
 
-        if (similarity >= threshold) {
-          console.warn(`[SECURITY] Blocked duplicate face enrollment. Matches existing roll: ${existingUser.roll_number} (Sim: ${similarity.toFixed(3)})`);
+        if (faceDistance <= FACE_DISTANCE_THRESHOLD) {
+          console.warn(`[SECURITY] Blocked duplicate face enrollment. Matches existing roll: ${existingUser.roll_number} (Dist: ${faceDistance.toFixed(3)})`);
           return res.status(400).json({
             message: `BIOMETRIC CONFLICT: This face is already enrolled under Roll Number ${existingUser.roll_number}. Duplicate physical registrations are strictly prohibited.`
           });
@@ -260,20 +263,19 @@ router.post('/complete-profile', async (req, res) => {
         'SELECT id, roll_number, face_embedding FROM users WHERE face_embedding IS NOT NULL AND college_email != $1 AND role = $2',
         [email.toLowerCase().trim(), 'student']
       );
-      const threshold = 0.58;
 
       for (const existingUser of allUsersResult.rows) {
         let storedEmbedding = existingUser.face_embedding;
         if (typeof storedEmbedding === 'string') {
           try { storedEmbedding = JSON.parse(storedEmbedding); } catch (e) { }
         }
-        if (!storedEmbedding) continue;
+        if (Array.isArray(storedEmbedding?.descriptor)) storedEmbedding = storedEmbedding.descriptor;
+        if (!isValidDescriptor(storedEmbedding)) continue;
 
         const faceDistance = compareDescriptors(storedEmbedding, face_descriptor);
-        const similarity = 1 - faceDistance;
 
-        if (similarity >= threshold) {
-          console.warn(`[SECURITY] Blocked duplicate face completion. Matches existing roll: ${existingUser.roll_number} (Sim: ${similarity.toFixed(3)})`);
+        if (faceDistance <= FACE_DISTANCE_THRESHOLD) {
+          console.warn(`[SECURITY] Blocked duplicate face completion. Matches existing roll: ${existingUser.roll_number} (Dist: ${faceDistance.toFixed(3)})`);
           return res.status(400).json({
             message: `BIOMETRIC CONFLICT: This face is already enrolled under Roll Number ${existingUser.roll_number}. Duplicate physical registrations are strictly prohibited.`
           });

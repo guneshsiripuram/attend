@@ -16,6 +16,19 @@ const QUALITY_THRESHOLDS = {
   minSharpness: 7
 };
 
+// Shared canvas reused for brightness/sharpness analysis (browser only).
+const qualityCanvas = () => {
+  if (typeof document === 'undefined') return null;
+  const c = document.createElement('canvas');
+  return c;
+};
+
+const centerOf = (points) => {
+  let x = 0, y = 0;
+  for (const p of points) { x += p.x; y += p.y; }
+  return { x: x / points.length, y: y / points.length };
+};
+
 class FaceService {
   constructor() {
     this.modelsLoaded = false;
@@ -61,6 +74,82 @@ class FaceService {
     }
   }
 
+  /**
+   * Downscaled grayscale + variance-of-Laplacian sharpness and mean brightness.
+   * Cheap enough to run per-frame during liveness checks.
+   */
+  analyzeImageStats(img) {
+    if (typeof document === 'undefined') return { brightness: 127, sharpness: 99 };
+    const canvas = qualityCanvas();
+    const maxDim = 200;
+    const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+    canvas.width = Math.max(1, Math.round(img.width * scale));
+    canvas.height = Math.max(1, Math.round(img.height * scale));
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const w = canvas.width, h = canvas.height;
+    const gray = new Float32Array(w * h);
+    let sum = 0;
+    for (let i = 0; i < gray.length; i++) {
+      gray[i] = 0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2];
+      sum += gray[i];
+    }
+    const brightness = sum / gray.length;
+    let s = 0, sSq = 0, n = 0;
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const idx = y * w + x;
+        const lap = gray[idx - 1] + gray[idx + 1] + gray[idx - w] + gray[idx + w] - 4 * gray[idx];
+        s += lap; sSq += lap * lap; n++;
+      }
+    }
+    const mean = n ? s / n : 0;
+    const sharpness = n ? Math.sqrt(Math.max(0, sSq / n - mean * mean)) : 0;
+    return { brightness, sharpness };
+  }
+
+  /**
+   * Applies the quality gates. Returns an array of human-readable problems;
+   * empty array means the frame passed.
+   */
+  evaluateQuality(img, detection) {
+    const reasons = [];
+    const iw = img.width, ih = img.height;
+    if (!iw || !ih) return ['Frame unavailable'];
+
+    const box = detection.box;
+    if (detection.score < QUALITY_THRESHOLDS.minConfidence) reasons.push('low confidence');
+    if (box.width / iw < QUALITY_THRESHOLDS.minFaceWidthRatio) reasons.push('face too small');
+    if (box.height / ih < QUALITY_THRESHOLDS.minFaceHeightRatio) reasons.push('face too small');
+
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const hOff = Math.abs(cx - iw / 2) / iw;
+    const vOff = Math.abs(cy - ih / 2) / ih;
+    if (hOff > QUALITY_THRESHOLDS.maxHorizontalOffsetRatio) reasons.push('face not centered horizontally');
+    if (vOff > QUALITY_THRESHOLDS.maxVerticalOffsetRatio) reasons.push('face not centered vertically');
+
+    if (detection.landmarks) {
+      const left = centerOf(detection.landmarks.getLeftEye());
+      const right = centerOf(detection.landmarks.getRightEye());
+      const tilt = Math.abs((Math.atan2(right.y - left.y, right.x - left.x) * 180) / Math.PI);
+      if (tilt > QUALITY_THRESHOLDS.maxEyeTiltDegrees) reasons.push('head tilted');
+
+      const nose = detection.landmarks.getNose()[0];
+      if (nose && box.width > 0) {
+        const yaw = Math.abs(nose.x - cx) / box.width;
+        if (yaw > QUALITY_THRESHOLDS.maxYawRatio) reasons.push('face turned sideways');
+      }
+    }
+
+    const { brightness, sharpness } = this.analyzeImageStats(img);
+    if (brightness < QUALITY_THRESHOLDS.minBrightness || brightness > QUALITY_THRESHOLDS.maxBrightness) reasons.push('poor lighting');
+    if (sharpness < QUALITY_THRESHOLDS.minSharpness) reasons.push('blurry image');
+
+    return reasons;
+  }
+
   async analyzeBase64(base64Image, options = { isEnrollment: false }) {
     if (!base64Image) return { isGood: false, reason: 'Empty image' };
     if (!this.modelsLoaded) await this.loadModels();
@@ -74,7 +163,7 @@ class FaceService {
       });
 
       const detectionOptions = options.isEnrollment 
-        ? new faceapi.SsdMobilenetv1Options({ minConfidence: 0.25 }) 
+        ? new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }) 
         : DETECTION_OPTIONS;
 
       const detection = await faceapi
@@ -84,7 +173,11 @@ class FaceService {
 
       if (!detection) return { isGood: false, reason: 'No face detected. Please face the light source (avoid bright backgrounds).' };
 
-      // Optional: Add quality checks here if needed
+      const problems = this.evaluateQuality(img, detection);
+      if (problems.length > 0) {
+        return { isGood: false, reason: 'Improve frame: ' + problems.join(', '), detection };
+      }
+
       return {
         isGood: true,
         descriptor: Array.from(detection.descriptor),

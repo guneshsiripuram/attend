@@ -108,15 +108,22 @@ router.post('/verify', authMiddleware, async (req, res) => {
      
      if (!finalStored) return res.status(400).json({ message: 'Face enrollment required. Please register your face first.' });
 
-     const { compareDescriptors } = require('../utils/faceUtils');
-     const faceDistance = compareDescriptors(finalStored, face_descriptor);
-     const similarity = 1 - faceDistance; 
-     const threshold = 0.40;
+     const { compareDescriptors, isValidDescriptor, FACE_DISTANCE_THRESHOLD } = require('../utils/faceUtils');
 
-     if (similarity < threshold) {
+     if (!isValidDescriptor(finalStored)) {
+       return res.status(403).json({ message: 'IDENTITY FAILED: Stored face data is invalid. Please re-enroll your face from the admin dashboard.' });
+     }
+     if (!isValidDescriptor(face_descriptor)) {
+       return res.status(400).json({ message: 'IDENTITY FAILED: Face capture was invalid. Please retry in good lighting.' });
+     }
+
+     const faceDistance = compareDescriptors(finalStored, face_descriptor);
+     const similarity = 1 - faceDistance;
+
+     if (faceDistance > FACE_DISTANCE_THRESHOLD) {
         await query(
           'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',
-          [userId, user.roll_number, user.section, 'Failed_Match', JSON.stringify(location)]
+          [userId, user.roll_number, user.section, 'Failed_Match', JSON.stringify({ ...location, face_similarity: +similarity.toFixed(4), face_distance: +faceDistance.toFixed(4) })]
         );
         return res.status(403).json({ message: 'IDENTITY FAILED: Face match failed.', details: 'Ensure you are in a well-lit area and looking directly at the camera.' });
      }
@@ -124,7 +131,7 @@ router.post('/verify', authMiddleware, async (req, res) => {
      // Success
      await query(
        'INSERT INTO attendance_logs (user_id, roll_number, section, status, location_data) VALUES ($1, $2, $3, $4, $5)',
-       [userId, user.roll_number, user.section, 'Present', JSON.stringify(location)]
+       [userId, user.roll_number, user.section, 'Present', JSON.stringify({ ...location, face_similarity: +similarity.toFixed(4), face_distance: +faceDistance.toFixed(4) })]
      );
 
      res.json({ 
