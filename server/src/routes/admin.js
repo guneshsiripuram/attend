@@ -1,8 +1,21 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
 const { query } = require('../db');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
+const { isStrongPassword } = require('../utils/password');
 
 const router = express.Router();
+
+// Today's date in Asia/Kolkata (YYYY-MM-DD), so every "today" report uses the
+// same timezone as the rest of the system.
+const istToday = () =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+
+const isValidLatLng = (lat, lng) => {
+  const la = Number(lat), ln = Number(lng);
+  return Number.isFinite(la) && la >= -90 && la <= 90 &&
+         Number.isFinite(ln) && ln >= -180 && ln <= 180;
+};
 
 // Get All Attendance (Admin only)
 router.get('/attendance/all', authMiddleware, adminMiddleware, async (req, res) => {
@@ -56,7 +69,7 @@ router.get('/attendance/all', authMiddleware, adminMiddleware, async (req, res) 
     const summaryResult = await query(`
       SELECT 
         (SELECT COUNT(*) FROM users WHERE role = 'student')::int as "totalstudents",
-        (SELECT COUNT(DISTINCT user_id) FROM attendance_logs WHERE timestamp::date = CURRENT_DATE AND status = 'Present')::int as "presenttoday"
+        (SELECT COUNT(DISTINCT user_id) FROM attendance_logs WHERE (timestamp AT TIME ZONE 'Asia/Kolkata')::date = CURRENT_DATE AND status = 'Present')::int as "presenttoday"
     `);
 
     res.json({ 
@@ -72,7 +85,8 @@ router.get('/attendance/all', authMiddleware, adminMiddleware, async (req, res) 
 // Get Live Class Roster (Virtual Approach: Users LEFT JOIN Logs)
 router.get('/attendance/roster', authMiddleware, adminMiddleware, async (req, res) => {
   const { date, branch, section } = req.query;
-  const targetDate = date || new Date().toISOString().split('T')[0];
+  // Default to IST today so the roster matches the attendance records' timezone.
+  const targetDate = date || istToday();
   
   let q = `
     SELECT 
@@ -89,7 +103,7 @@ router.get('/attendance/roster', authMiddleware, adminMiddleware, async (req, re
       SELECT status, timestamp 
       FROM attendance_logs 
       WHERE user_id = u.id 
-        AND "timestamp"::date = $1
+        AND (timestamp AT TIME ZONE 'Asia/Kolkata')::date = $1
       ORDER BY 
         CASE WHEN status = 'Present' THEN 1 ELSE 2 END,
         "timestamp" DESC
@@ -163,6 +177,53 @@ router.get('/students', authMiddleware, adminMiddleware, async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error fetching students' });
+  }
+});
+
+// Create Student (admin). Unlike the self-service /auth/register endpoint,
+// an admin-created account does NOT require a face template yet — the student
+// enrolls their face later from their own dashboard.
+router.post('/students', authMiddleware, adminMiddleware, async (req, res) => {
+  const { full_name, roll_number, branch, section, college_email, password } = req.body;
+
+  if (!full_name || !roll_number || !branch || !section || !college_email) {
+    return res.status(400).json({ message: 'Full name, roll number, branch, section and college email are required.' });
+  }
+  if (!isStrongPassword(password)) {
+    return res.status(400).json({ message: 'Password must be at least 8 characters, contain a letter and a number, and not be a common password.' });
+  }
+
+  const emailLower = college_email.toLowerCase().trim();
+  const collegeDomain = (process.env.COLLEGE_DOMAIN || '@raghuenggcollege.in').toLowerCase();
+  if (!emailLower.endsWith(collegeDomain)) {
+    return res.status(400).json({ message: `Only ${collegeDomain} emails are allowed for students.` });
+  }
+
+  try {
+    const duplicateCheck = await query(
+      'SELECT college_email, roll_number FROM users WHERE college_email = $1 OR roll_number = $2',
+      [emailLower, roll_number]
+    );
+    if (duplicateCheck.rows.length > 0) {
+      const dup = duplicateCheck.rows[0];
+      if (dup.college_email === emailLower) {
+        return res.status(400).json({ message: 'An account with this college email is already registered.' });
+      }
+      return res.status(400).json({ message: `The Roll Number ${roll_number} is already registered to another student account.` });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const result = await query(
+      'INSERT INTO users (full_name, roll_number, branch, section, college_email, password_hash, role, face_embedding) VALUES ($1, $2, $3, $4, $5, $6, $7, NULL) RETURNING id, full_name, roll_number, branch, section, college_email, role',
+      [full_name, roll_number, branch, section, emailLower, hashedPassword, 'student']
+    );
+    res.status(201).json({ user: result.rows[0], message: 'Student account created successfully.' });
+  } catch (error) {
+    console.error(error);
+    if (error.code === '23505') {
+      return res.status(400).json({ message: 'A student with this email or roll number already exists.' });
+    }
+    res.status(500).json({ message: 'Server error creating student.' });
   }
 });
 
@@ -270,10 +331,17 @@ router.get('/session', authMiddleware, async (req, res) => {
 // Update Location Settings
 router.post('/session/location', authMiddleware, adminMiddleware, async (req, res) => {
   const { lat, lng, radius } = req.body;
+  if (!isValidLatLng(lat, lng)) {
+    return res.status(400).json({ message: 'Invalid latitude/longitude. Latitude must be between -90 and 90, longitude between -180 and 180.' });
+  }
+  const maxDistance = parseInt(radius, 10);
+  if (!Number.isFinite(maxDistance) || maxDistance < 10 || maxDistance > 50000) {
+    return res.status(400).json({ message: 'Max distance must be a number between 10 and 50000 meters.' });
+  }
   try {
     await query(
       "UPDATE portal_settings SET campus_lat = $1, campus_lng = $2, max_distance_meters = $3, updated_at = CURRENT_TIMESTAMP WHERE id = 1",
-      [lat, lng, radius]
+      [Number(lat), Number(lng), maxDistance]
     );
     res.json({ message: 'Geolocation settings updated successfully' });
   } catch (error) {
@@ -288,27 +356,39 @@ router.post('/session/toggle', authMiddleware, adminMiddleware, async (req, res)
   try {
     let startsAt = null;
     let expiresAt = null;
-    
+
     if (isOpen) {
       if (startTime && endTime) {
         // Scheduled future session
         startsAt = new Date(startTime);
         expiresAt = new Date(endTime);
+        if (Number.isNaN(startsAt.getTime()) || Number.isNaN(expiresAt.getTime())) {
+          return res.status(400).json({ message: 'Invalid schedule times.' });
+        }
+        if (expiresAt <= startsAt) {
+          return res.status(400).json({ message: 'Session end time must be after the start time.' });
+        }
       } else if (durationMinutes) {
         // Instant opening
+        const minutes = parseInt(durationMinutes, 10);
+        if (!Number.isFinite(minutes) || minutes < 1 || minutes > 1440) {
+          return res.status(400).json({ message: 'Duration must be between 1 and 1440 minutes.' });
+        }
         startsAt = new Date();
-        expiresAt = new Date(Date.now() + durationMinutes * 60000);
+        expiresAt = new Date(Date.now() + minutes * 60000);
+      } else {
+        return res.status(400).json({ message: 'Provide either a duration or a scheduled start/end window.' });
       }
     }
-    
+
     await query(
       "UPDATE portal_settings SET is_open = $1, session_starts_at = $2, expires_at = $3, updated_at = CURRENT_TIMESTAMP WHERE id = 1",
       [isOpen, startsAt, expiresAt]
     );
-    
-    res.json({ 
-      message: `Attendance gate ${isOpen ? (startTime ? 'SCHEDULED' : 'OPEN') : 'CLOSED'}`, 
-      startsAt, 
+
+    res.json({
+      message: `Attendance gate ${isOpen ? (startTime ? 'SCHEDULED' : 'OPEN') : 'CLOSED'}`,
+      startsAt,
       expiresAt,
       serverTime: new Date(),
       isOpen
@@ -317,11 +397,9 @@ router.post('/session/toggle', authMiddleware, adminMiddleware, async (req, res)
     console.error('--- SESSION_TOGGLE_ERROR ---');
     console.error('Error name:', error.name);
     console.error('Error message:', error.message);
-    
-    res.status(500).json({ 
-      message: 'Error toggling session',
-      error: error.message,
-      details: error.stack ? 'Check server logs for detailed trace' : 'Internal Server Error'
+
+    res.status(500).json({
+      message: 'Error toggling session'
     });
   }
 });

@@ -4,6 +4,18 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
 
+// A GPS coordinate is only trusted when both values are real finite numbers
+// within valid geographic ranges. Anything else (NaN, strings, out-of-range)
+// would poison the Haversine math (NaN > max is false) and bypass the fence.
+const isValidLocation = (location) =>
+  !!location &&
+  typeof location.lat === 'number' &&
+  Number.isFinite(location.lat) &&
+  typeof location.lng === 'number' &&
+  Number.isFinite(location.lng) &&
+  location.lat >= -90 && location.lat <= 90 &&
+  location.lng >= -180 && location.lng <= 180;
+
 // Haversine formula to calculate distance between two GPS coordinates
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371e3; // Earth radius in meters
@@ -24,7 +36,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 router.post('/check-location', authMiddleware, async (req, res) => {
   const { location } = req.body;
   
-  if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') {
+  if (!isValidLocation(location)) {
     return res.status(400).json({ success: false, message: 'Invalid or missing location data.' });
   }
 
@@ -54,6 +66,11 @@ router.post('/verify', authMiddleware, async (req, res) => {
   const userId = req.user.id;
 
   try {
+     // Reject malformed coordinates up front (see isValidLocation above).
+     if (!isValidLocation(location)) {
+       return res.status(400).json({ message: 'IDENTITY FAILED: Invalid location data. Please retry with location enabled.' });
+     }
+
      // Session Check
      const sessionResult = await query('SELECT is_open, session_starts_at, expires_at, campus_lat, campus_lng, max_distance_meters FROM portal_settings WHERE id = 1');
      const session = sessionResult.rows[0];
@@ -102,22 +119,26 @@ router.post('/verify', authMiddleware, async (req, res) => {
      }
 
      // Face Comparison
+     const { normalizeDescriptor, isValidDescriptor, compareDescriptors, FACE_DISTANCE_THRESHOLD } = require('../utils/faceUtils');
+
+     // Stored templates may be a flat descriptor, a burst of samples, or an
+     // object wrapper. Normalize everything to one flat descriptor.
      let storedEmbedding = user.face_embedding;
-     if (typeof storedEmbedding === 'string') storedEmbedding = JSON.parse(storedEmbedding);
-     const finalStored = Array.isArray(storedEmbedding) ? storedEmbedding : (storedEmbedding?.descriptor || storedEmbedding);
-     
+     if (typeof storedEmbedding === 'string') {
+       try { storedEmbedding = JSON.parse(storedEmbedding); } catch (e) { }
+     }
+     const finalStored = normalizeDescriptor(storedEmbedding);
+     const probe = normalizeDescriptor(face_descriptor);
+
      if (!finalStored) return res.status(400).json({ message: 'Face enrollment required. Please register your face first.' });
-
-     const { compareDescriptors, isValidDescriptor, FACE_DISTANCE_THRESHOLD } = require('../utils/faceUtils');
-
      if (!isValidDescriptor(finalStored)) {
        return res.status(403).json({ message: 'IDENTITY FAILED: Stored face data is invalid. Please re-enroll your face from the admin dashboard.' });
      }
-     if (!isValidDescriptor(face_descriptor)) {
+     if (!isValidDescriptor(probe)) {
        return res.status(400).json({ message: 'IDENTITY FAILED: Face capture was invalid. Please retry in good lighting.' });
      }
 
-     const faceDistance = compareDescriptors(finalStored, face_descriptor);
+     const faceDistance = compareDescriptors(finalStored, probe);
      const similarity = 1 - faceDistance;
 
      if (faceDistance > FACE_DISTANCE_THRESHOLD) {
@@ -144,6 +165,62 @@ router.post('/verify', authMiddleware, async (req, res) => {
   }
 });
 
+// Enroll (or re-enroll) the logged-in student's face template.
+// This is the path admin-created accounts use to add their biometric profile,
+// and it doubles as the re-enrollment flow after a biometric reset.
+router.post('/enroll-face', authMiddleware, async (req, res) => {
+  const { face_descriptor } = req.body;
+  const userId = req.user.id;
+
+  try {
+    if (req.user.role !== 'student') {
+      return res.status(403).json({ message: 'Only students can enroll a face template.' });
+    }
+
+    const { normalizeDescriptor, isValidDescriptor, compareDescriptors, FACE_DISTANCE_THRESHOLD } = require('../utils/faceUtils');
+    const probe = normalizeDescriptor(face_descriptor);
+    if (!isValidDescriptor(probe)) {
+      return res.status(400).json({ message: 'Face capture was invalid. Please record a clear, well-lit video and try again.' });
+    }
+
+    // STRICT BIOMETRIC DEDUPLICATION: reject if this face is already enrolled
+    // under another student's account.
+    const allUsersResult = await query(
+      'SELECT id, roll_number, face_embedding FROM users WHERE face_embedding IS NOT NULL AND id != $1 AND role = $2',
+      [userId, 'student']
+    );
+    for (const existingUser of allUsersResult.rows) {
+      let storedEmbedding = existingUser.face_embedding;
+      if (typeof storedEmbedding === 'string') {
+        try { storedEmbedding = JSON.parse(storedEmbedding); } catch (e) { }
+      }
+      const stored = normalizeDescriptor(storedEmbedding);
+      if (!isValidDescriptor(stored)) continue;
+
+      const faceDistance = compareDescriptors(stored, probe);
+      if (faceDistance <= FACE_DISTANCE_THRESHOLD) {
+        console.warn(`[SECURITY] Blocked face enrollment. Matches existing roll: ${existingUser.roll_number} (Dist: ${faceDistance.toFixed(3)})`);
+        return res.status(400).json({
+          message: `BIOMETRIC CONFLICT: This face is already enrolled under Roll Number ${existingUser.roll_number}. Duplicate physical registrations are strictly prohibited.`
+        });
+      }
+    }
+
+    const result = await query(
+      'UPDATE users SET face_embedding = $1 WHERE id = $2 RETURNING face_embedding IS NOT NULL as has_face',
+      [JSON.stringify(probe), userId]
+    );
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'User profile not found.' });
+    }
+
+    res.json({ message: 'Face enrollment saved successfully.', hasFace: true });
+  } catch (error) {
+    console.error('ENROLL_FACE_ERROR:', error);
+    res.status(500).json({ message: 'Server error during face enrollment.' });
+  }
+});
+
 // Get Personal Attendance (Fixed Total Days logic)
 router.get('/me', authMiddleware, async (req, res) => {
   try {
@@ -151,9 +228,19 @@ router.get('/me', authMiddleware, async (req, res) => {
       'SELECT * FROM attendance_logs WHERE user_id = $1 ORDER BY timestamp DESC',
       [req.user.id]
     );
-    
-    // FIX: Calculate totalDays from ONLY valid active days (status = 'Present')
-    const dayCountResult = await query('SELECT COUNT(DISTINCT ("timestamp" AT TIME ZONE \'Asia/Kolkata\')::date) as count FROM attendance_logs WHERE status = \'Present\'');
+
+    // Face-enrollment status so the dashboard can prompt when biometrics are missing.
+    const userResult = await query('SELECT face_embedding IS NOT NULL as has_face, branch FROM users WHERE id = $1', [req.user.id]);
+    const userMeta = userResult.rows[0] || { has_face: false, branch: null };
+
+    // Total class days = distinct IST dates on which ANY student in the same
+    // branch was marked Present. This is more accurate than a global count.
+    const dayCountResult = await query(
+      `SELECT COUNT(DISTINCT (al.timestamp AT TIME ZONE 'Asia/Kolkata')::date) as count
+       FROM attendance_logs al JOIN users u ON al.user_id = u.id
+       WHERE al.status = 'Present' AND u.branch = $1`,
+      [userMeta.branch]
+    );
     const totalDays = parseInt(dayCountResult.rows[0].count) || 1; 
 
     const statsByDate = {};
@@ -174,7 +261,7 @@ router.get('/me', authMiddleware, async (req, res) => {
     }, 0);
     const percentage = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
 
-    res.json({ logs: result.rows, stats: { percentage, present: presentDays, total: totalDays } });
+    res.json({ logs: result.rows, hasFace: !!userMeta.has_face, stats: { percentage, present: presentDays, total: totalDays } });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error fetching history.' });

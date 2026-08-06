@@ -58,7 +58,7 @@ const compareDescriptors = (gallery, probe) => {
 };
 
 /**
- * Returns true when a face descriptor is usable (finite, non-zero, correct dim).
+ * Returns true when a single face descriptor is usable (finite, non-zero, correct dim).
  */
 const isValidDescriptor = (desc) =>
   Array.isArray(desc) &&
@@ -66,4 +66,48 @@ const isValidDescriptor = (desc) =>
   desc.every((v) => Number.isFinite(v)) &&
   desc.some((v) => v !== 0);
 
-module.exports = { compareDescriptors, cosineDistance, isValidDescriptor, FACE_DISTANCE_THRESHOLD, FACE_SIMILARITY_THRESHOLD };
+/**
+ * Averages an array of valid flat descriptors into one descriptor.
+ * Returns null when no valid samples exist.
+ */
+const averageDescriptors = (samples) => {
+  const valid = Array.isArray(samples) ? samples.filter((s) => isValidDescriptor(s)) : [];
+  if (valid.length === 0) return null;
+  const avg = new Array(128).fill(0);
+  for (const s of valid) {
+    for (let i = 0; i < 128; i++) avg[i] += s[i];
+  }
+  for (let i = 0; i < 128; i++) avg[i] /= valid.length;
+  return avg;
+};
+
+/**
+ * Normalizes any accepted embedding format into ONE flat 128-length descriptor:
+ *  - a flat 128 array (single capture)
+ *  - an array of flat 128 arrays (multi-sample burst) -> averaged
+ *  - an object shaped { descriptor: ... }
+ * Returns null when the input is unusable/corrupt.
+ */
+const normalizeDescriptor = (input) => {
+  if (!input) return null;
+  if (Array.isArray(input)) {
+    if (input.length === 128 && input.every((v) => typeof v === 'number')) {
+      return isValidDescriptor(input) ? input : null;
+    }
+    return averageDescriptors(input);
+  }
+  if (typeof input === 'object') {
+    return normalizeDescriptor(input.descriptor);
+  }
+  return null;
+};
+
+module.exports = {
+  compareDescriptors,
+  cosineDistance,
+  isValidDescriptor,
+  normalizeDescriptor,
+  averageDescriptors,
+  FACE_DISTANCE_THRESHOLD,
+  FACE_SIMILARITY_THRESHOLD
+};

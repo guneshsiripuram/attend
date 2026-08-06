@@ -29,6 +29,13 @@ const StudentDashboard = ({ user }) => {
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const [serverTimeOffset, setServerTimeOffset] = useState(0); 
 
+  const [hasFace, setHasFace] = useState(null);
+  const [showEnroll, setShowEnroll] = useState(false);
+  const [enrollStep, setEnrollStep] = useState(0);
+  const [enrollSamples, setEnrollSamples] = useState([]);
+  const [enrollStatus, setEnrollStatus] = useState('idle');
+  const [enrollError, setEnrollError] = useState('');
+
   const autoVerifyTimeout = useRef(null);
   const isBlinkSuccessful = useRef(false);
 
@@ -61,6 +68,7 @@ const StudentDashboard = ({ user }) => {
       const resp = await axios.get('/attendance/me');
       setHistory(resp.data.logs || []);
       setStats(resp.data.stats || { percentage: 0, present: 0, total: 0 });
+      if (typeof resp.data.hasFace === 'boolean') setHasFace(resp.data.hasFace);
     } catch (err) {
       console.error('History fetch failed:', err);
     }
@@ -83,6 +91,60 @@ const StudentDashboard = ({ user }) => {
 
   const getServerNow = useCallback(() => new Date(Date.now() + serverTimeOffset), [serverTimeOffset]);
   const isTrulyOpen = !!(session?.is_open && (!session.starts_at || new Date(session.starts_at) <= getServerNow()));
+
+  // Students without an enrolled face template must enroll before they can
+  // verify. Auto-open the enrollment overlay so the flow is impossible to miss.
+  useEffect(() => {
+    if (hasFace === false) setShowEnroll(true);
+  }, [hasFace]);
+
+  const captureEnrollSample = async () => {
+    if (!webcamRef.current) return;
+    setEnrollStatus('recording');
+    setEnrollError('');
+    await new Promise(r => setTimeout(r, 500));
+    const frame = webcamRef.current.getScreenshot();
+    if (!frame) {
+      setEnrollError('Could not capture a camera frame. Check your camera and retry.');
+      setEnrollStatus('idle');
+      return;
+    }
+    const analysis = await FaceService.analyzeBase64(frame, { isEnrollment: true });
+    if (!analysis.isGood) {
+      setEnrollError(`Step ${enrollStep + 1} failed: ${analysis.reason}`);
+      setEnrollStatus('idle');
+      return;
+    }
+    const next = [...enrollSamples];
+    next[enrollStep] = analysis.descriptor;
+    setEnrollSamples(next);
+    if (enrollStep < 2) setEnrollStep(enrollStep + 1);
+    setEnrollStatus('idle');
+  };
+
+  const saveEnrollment = async () => {
+    if (enrollSamples.length < 3) return;
+    setEnrollStatus('saving');
+    setEnrollError('');
+    try {
+      await axios.post('/attendance/enroll-face', { face_descriptor: enrollSamples });
+      setHasFace(true);
+      setShowEnroll(false);
+      setEnrollSamples([]);
+      setEnrollStep(0);
+      fetchHistory();
+    } catch (err) {
+      setEnrollError(err.response?.data?.message || 'Enrollment failed. Please try again.');
+      setEnrollStatus('idle');
+    }
+  };
+
+  const openReEnroll = () => {
+    setEnrollStep(0);
+    setEnrollSamples([]);
+    setEnrollError('');
+    setShowEnroll(true);
+  };
 
   const performFinalSubmit = useCallback(async (loc) => {
     const burstDescriptors = [];
@@ -198,11 +260,11 @@ const StudentDashboard = ({ user }) => {
   }, [isVerifying, livenessStatus, isTrulyOpen, startLivenessChallenge]);
 
   useEffect(() => {
-    if (isAutoMode && !result?.success && !isVerifying && isTrulyOpen) {
+    if (isAutoMode && !result?.success && !isVerifying && isTrulyOpen && !showEnroll) {
       autoVerifyTimeout.current = setTimeout(handleVerify, 1500);
     }
     return () => clearTimeout(autoVerifyTimeout.current);
-  }, [isAutoMode, result, isVerifying, isTrulyOpen, handleVerify]);
+  }, [isAutoMode, result, isVerifying, isTrulyOpen, showEnroll, handleVerify]);
 
   const getTodayStatus = useCallback(() => {
     const todayStr = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })).toISOString().split('T')[0];
@@ -318,6 +380,45 @@ const StudentDashboard = ({ user }) => {
              )}
              {isVerifying && livenessStatus === 'challenge' && <div className="absolute inset-x-0 bottom-0 bg-slate-900/80 py-6 text-center text-white font-black text-2xl uppercase animate-pulse">Blink Now!</div>}
              {isVerifying && (livenessStatus === 'checking_location' || livenessStatus === 'success') && <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center"><Loader2 className="w-16 h-16 text-white animate-spin" /></div>}
+             {showEnroll && (
+               <div className="absolute inset-0 z-30 bg-slate-950/85 backdrop-blur-sm flex flex-col items-center justify-center gap-4 p-6 text-center">
+                 <p className="text-white text-sm font-black uppercase tracking-widest">{hasFace ? 'Re-Enroll Face' : 'Face Enrollment Required'}</p>
+                 <p className="text-white/90 text-lg font-black">Step {enrollStep + 1} / 3</p>
+                 <p className="text-primary-300 text-xs font-bold uppercase tracking-widest">
+                   {enrollStep === 0 ? 'Look straight at the camera' : enrollStep === 1 ? 'Tilt slightly to your left' : 'Tilt slightly to your right'}
+                 </p>
+                 <div className="flex items-center gap-2">
+                   {[0, 1, 2].map(i => (
+                     <span key={i} className={`w-3 h-3 rounded-full ${enrollSamples[i] ? 'bg-green-400' : enrollStep === i ? 'bg-primary-400 animate-pulse' : 'bg-slate-600'}`}></span>
+                   ))}
+                 </div>
+                 {enrollError && <p className="text-red-300 text-xs font-bold max-w-xs">{enrollError}</p>}
+                 {enrollStep < 3 ? (
+                   <button
+                     onClick={captureEnrollSample}
+                     disabled={enrollStatus === 'recording' || enrollStatus === 'saving'}
+                     className="flex items-center gap-2 py-4 px-8 rounded-2xl bg-primary-600 text-white font-black text-xs uppercase tracking-widest shadow-xl hover:bg-primary-700 disabled:opacity-50"
+                   >
+                     {enrollStatus === 'recording' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
+                     {enrollSamples[enrollStep] ? 'Retake' : 'Capture'} Step {enrollStep + 1}
+                   </button>
+                 ) : (
+                   <button
+                     onClick={saveEnrollment}
+                     disabled={enrollStatus === 'saving' || enrollStatus === 'recording'}
+                     className="flex items-center gap-2 py-4 px-8 rounded-2xl bg-green-600 text-white font-black text-xs uppercase tracking-widest shadow-xl hover:bg-green-700 disabled:opacity-50"
+                   >
+                     {enrollStatus === 'saving' ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
+                     Save Face Enrollment
+                   </button>
+                 )}
+                 {hasFace && (
+                   <button onClick={() => setShowEnroll(false)} className="text-slate-400 text-xs font-bold uppercase tracking-widest hover:text-white">
+                     Cancel
+                   </button>
+                 )}
+               </div>
+             )}
            </div>
            <div className="w-full max-w-lg space-y-6">
              {result && <div className={`p-5 rounded-2xl border-2 ${result.success ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}><p className="text-lg font-black">{result.message}</p></div>}
@@ -329,9 +430,14 @@ const StudentDashboard = ({ user }) => {
                  </button>
                </div>
              )}
-             <button onClick={handleVerify} disabled={isVerifying || result?.success || !isTrulyOpen} className={`w-full py-6 rounded-3xl font-black uppercase text-sm ${isVerifying || result?.success || !isTrulyOpen ? 'bg-slate-200 text-slate-400' : 'bg-primary-600 text-white shadow-xl shadow-primary-200'}`}>
+             <button onClick={handleVerify} disabled={isVerifying || result?.success || !isTrulyOpen || showEnroll} className={`w-full py-6 rounded-3xl font-black uppercase text-sm ${isVerifying || result?.success || !isTrulyOpen || showEnroll ? 'bg-slate-200 text-slate-400' : 'bg-primary-600 text-white shadow-xl shadow-primary-200'}`}>
                {isVerifying ? <Loader2 className="w-6 h-6 animate-spin mx-auto" /> : (result?.success ? 'Marked' : 'Confirm Attendance')}
              </button>
+             {hasFace && !showEnroll && (
+               <button onClick={openReEnroll} className="w-full py-3 rounded-2xl bg-slate-100 text-slate-600 font-black uppercase text-xs hover:bg-slate-200 transition-all">
+                 Re-Enroll Face
+               </button>
+             )}
            </div>
         </div>
       </div>

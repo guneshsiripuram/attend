@@ -223,7 +223,7 @@ const AdminDashboard = ({ user }) => {
     setAddLoading(true);
     setAddError('');
     try {
-      await axios.post('/auth/register', { ...newStudent, role: 'student' });
+      await axios.post('/admin/students', newStudent);
       setIsAddModalOpen(false);
       setNewStudent({ full_name: '', roll_number: '', college_email: '', branch: '', section: '', password: generatePassword() });
       fetchData();

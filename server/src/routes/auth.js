@@ -4,24 +4,10 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-const { compareDescriptors, isValidDescriptor, FACE_DISTANCE_THRESHOLD } = require('../utils/faceUtils');
+const { compareDescriptors, isValidDescriptor, normalizeDescriptor, FACE_DISTANCE_THRESHOLD } = require('../utils/faceUtils');
+const { isStrongPassword } = require('../utils/password');
 
 const router = express.Router();
-
-// Weak/common passwords rejected on registration.
-const WEAK_PASSWORDS = new Set([
-  'password', 'password123', 'password1234', 'password1', 'pass123',
-  '12345678', '123456789', '1234567890', 'qwerty123', 'admin123',
-  'admin1234', 'admin', 'student123', '1234abcd', 'abcd1234',
-  'iloveyou', '11111111', '88888888', '00000000'
-]);
-
-const isStrongPassword = (password) => {
-  if (typeof password !== 'string' || password.length < 8) return false;
-  if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) return false;
-  if (WEAK_PASSWORDS.has(password.toLowerCase())) return false;
-  return true;
-};
 
 // Google Login
 router.post('/google-login', async (req, res) => {
@@ -128,7 +114,9 @@ router.post('/register', async (req, res) => {
   }
 
   try {
-    let finalEmbedding = req.body.face_descriptor; // Fixed reference error
+    // Accept a single descriptor, a burst of samples, or a { descriptor } wrapper,
+    // and collapse it to ONE averaged flat descriptor for storage.
+    let finalEmbedding = normalizeDescriptor(req.body.face_descriptor); // Fixed reference error
 
     console.log('Registering user role:', normalizedRole, 'Email:', emailLower);
 
@@ -167,10 +155,10 @@ router.post('/register', async (req, res) => {
         if (typeof storedEmbedding === 'string') {
           try { storedEmbedding = JSON.parse(storedEmbedding); } catch (e) { }
         }
-        if (Array.isArray(storedEmbedding?.descriptor)) storedEmbedding = storedEmbedding.descriptor;
-        if (!isValidDescriptor(storedEmbedding)) continue;
+        const stored = normalizeDescriptor(storedEmbedding);
+        if (!isValidDescriptor(stored)) continue;
 
-        const faceDistance = compareDescriptors(storedEmbedding, finalEmbedding);
+        const faceDistance = compareDescriptors(stored, finalEmbedding);
 
         if (faceDistance <= FACE_DISTANCE_THRESHOLD) {
           console.warn(`[SECURITY] Blocked duplicate face enrollment. Matches existing roll: ${existingUser.roll_number} (Dist: ${faceDistance.toFixed(3)})`);
@@ -204,8 +192,13 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
+  if (typeof email !== 'string' || !email.trim() || typeof password !== 'string' || !password) {
+    return res.status(400).json({ message: 'Email and password are required.' });
+  }
+
   try {
-    const result = await query('SELECT * FROM users WHERE college_email = $1', [email]);
+    // Emails are stored lowercase; normalize the input so login is case-insensitive.
+    const result = await query('SELECT * FROM users WHERE college_email = $1', [email.toLowerCase().trim()]);
     if (result.rows.length === 0) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
@@ -225,6 +218,7 @@ router.post('/login', async (req, res) => {
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: 24 * 60 * 60 * 1000,
     });
 
@@ -257,7 +251,12 @@ router.post('/complete-profile', async (req, res) => {
     }
 
     // STRICT BIOMETRIC DEDUPLICATION (For Google OAuth Users)
-    if (face_descriptor) {
+    let finalFace = face_descriptor ? normalizeDescriptor(face_descriptor) : null;
+    if (face_descriptor && !isValidDescriptor(finalFace)) {
+      return res.status(400).json({ message: 'Face enrollment is invalid (missing or corrupt data). Please record a clear, well-lit video.' });
+    }
+
+    if (finalFace) {
       console.log('Scanning face against global database for Google profile completion duplicates...');
       const allUsersResult = await query(
         'SELECT id, roll_number, face_embedding FROM users WHERE face_embedding IS NOT NULL AND college_email != $1 AND role = $2',
@@ -269,10 +268,10 @@ router.post('/complete-profile', async (req, res) => {
         if (typeof storedEmbedding === 'string') {
           try { storedEmbedding = JSON.parse(storedEmbedding); } catch (e) { }
         }
-        if (Array.isArray(storedEmbedding?.descriptor)) storedEmbedding = storedEmbedding.descriptor;
-        if (!isValidDescriptor(storedEmbedding)) continue;
+        const stored = normalizeDescriptor(storedEmbedding);
+        if (!isValidDescriptor(stored)) continue;
 
-        const faceDistance = compareDescriptors(storedEmbedding, face_descriptor);
+        const faceDistance = compareDescriptors(stored, finalFace);
 
         if (faceDistance <= FACE_DISTANCE_THRESHOLD) {
           console.warn(`[SECURITY] Blocked duplicate face completion. Matches existing roll: ${existingUser.roll_number} (Dist: ${faceDistance.toFixed(3)})`);
@@ -285,7 +284,7 @@ router.post('/complete-profile', async (req, res) => {
 
     const result = await query(
       'UPDATE users SET roll_number = $1, section = $2, branch = $3, face_embedding = $4 WHERE college_email = $5 RETURNING *',
-      [roll_number, section, branch, JSON.stringify(face_descriptor), email.toLowerCase().trim()] // face_descriptor is now an array
+      [roll_number, section, branch, JSON.stringify(finalFace), email.toLowerCase().trim()] // face_descriptor is now an array
     );
 
     if (result.rows.length === 0) {

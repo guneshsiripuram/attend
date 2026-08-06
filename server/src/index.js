@@ -1,12 +1,10 @@
 require('dotenv').config();
 const express = require('express');
 const { initDB } = require('./db');
-initDB(); // Initialize table
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const path = require('path');
 
 const authRoutes = require('./routes/auth');
 const attendanceRoutes = require('./routes/attendance');
@@ -73,9 +71,6 @@ app.use(express.json({ limit: '50mb' })); // Large limit for base64 images
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
 
-// Static models
-app.use('/models', express.static(path.join(__dirname, '../models')));
-
 // Rate limiting: slow down credential-guessing on auth endpoints.
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -125,7 +120,14 @@ app.use((req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
-// Final check 
+// Boot: initialize tables before accepting traffic.
+initDB()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('Database initialization failed, aborting startup:', err);
+    process.exit(1);
+  });
