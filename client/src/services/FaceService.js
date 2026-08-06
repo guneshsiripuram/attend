@@ -1,7 +1,6 @@
 import * as faceapi from 'face-api.js';
 
 const MODEL_URL = '/models';
-const DETECTION_OPTIONS = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.6 });
 
 const QUALITY_THRESHOLDS = {
   minConfidence: 0.78,
@@ -164,9 +163,9 @@ class FaceService {
         img.onerror = () => reject(new Error('Image decode failed'));
       });
 
-      const detectionOptions = options.isEnrollment 
-        ? new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }) 
-        : DETECTION_OPTIONS;
+      // Enrollment tolerates harder angles/lighting; verification stays strict.
+      const minConfidence = options.minConfidence ?? (options.isEnrollment ? 0.4 : 0.6);
+      const detectionOptions = new faceapi.SsdMobilenetv1Options({ minConfidence });
 
       const detection = await faceapi
         .detectSingleFace(img, detectionOptions)
@@ -175,19 +174,50 @@ class FaceService {
 
       if (!detection) return { isGood: false, reason: 'No face detected. Please face the light source (avoid bright backgrounds).' };
 
+      // face-api chained results lose prototype getters, so the raw
+      // FaceDetection (with box/score) lives under `detection.detection`.
+      const score = detection.detection?.score ?? detection.score;
+
       const problems = this.evaluateQuality(img, detection);
       if (problems.length > 0) {
-        return { isGood: false, reason: 'Improve frame: ' + problems.join(', '), detection };
+        return { isGood: false, reason: 'Improve frame: ' + problems.join(', '), detection, score };
       }
 
       return {
         isGood: true,
         descriptor: Array.from(detection.descriptor),
-        detection: detection
+        detection: detection,
+        score
       };
     } catch (err) {
       return { isGood: false, reason: err.message };
     }
+  }
+
+  /**
+   * Enrollment helper: samples several live frames and returns the first one
+   * that passes the quality gates. If a face was seen but none passed, it
+   * returns the best-detected frame (with its guidance message). It only
+   * reports "No face" when zero frames contained a face, so a single blurry
+   * or blank frame can no longer fail a step.
+   */
+  async analyzeUntilGood(getFrame, options = {}) {
+    const { maxAttempts = 5, intervalMs = 350, ...rest } = options;
+    let best = null;
+    for (let i = 0; i < maxAttempts; i++) {
+      const frame = typeof getFrame === 'function' ? getFrame() : getFrame;
+      if (frame) {
+        const analysis = await this.analyzeBase64(frame, rest);
+        if (analysis.isGood) return analysis;
+        if (analysis.detection) {
+          const score = analysis.score || 0;
+          if (!best || score > best.score) best = { ...analysis, score };
+        }
+      }
+      if (i < maxAttempts - 1) await new Promise(r => setTimeout(r, intervalMs));
+    }
+    if (best) return best;
+    return { isGood: false, reason: 'No face detected. Please face the light source (avoid bright backgrounds).' };
   }
 
   detectBlinkSequence(frameResults) {

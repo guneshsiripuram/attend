@@ -102,14 +102,10 @@ const StudentDashboard = ({ user }) => {
     if (!webcamRef.current) return;
     setEnrollStatus('recording');
     setEnrollError('');
-    await new Promise(r => setTimeout(r, 500));
-    const frame = webcamRef.current.getScreenshot();
-    if (!frame) {
-      setEnrollError('Could not capture a camera frame. Check your camera and retry.');
-      setEnrollStatus('idle');
-      return;
-    }
-    const analysis = await FaceService.analyzeBase64(frame, { isEnrollment: true });
+    const analysis = await FaceService.analyzeUntilGood(
+      () => webcamRef.current && webcamRef.current.getScreenshot(),
+      { isEnrollment: true }
+    );
     if (!analysis.isGood) {
       setEnrollError(`Step ${enrollStep + 1} failed: ${analysis.reason}`);
       setEnrollStatus('idle');

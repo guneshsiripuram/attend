@@ -61,34 +61,33 @@ const Register = () => {
     setError('');
     
     setTimeout(async () => {
-      if (!webcamRef.current) return;
-      const frame = webcamRef.current.getScreenshot();
-      if (frame) {
-        try {
-          const analysis = await FaceService.analyzeBase64(frame, { isEnrollment: true });
-          if (!analysis.isGood) {
-            setError(`Step ${enrollmentStep + 1} Failed: ${analysis.reason}`);
-            setIsRecording(false);
-            return;
-          }
-          
-          setEnrolledSamples(prev => {
-            const next = [...prev];
-            next[enrollmentStep] = analysis.descriptor;
-            return next;
-          });
-          
-          if (enrollmentStep < 2) {
-            setEnrollmentStep(prev => prev + 1);
-          } else {
-            setSuccess('All poses captured successfully!');
-          }
-        } catch (err) {
-          setError('Face analysis failed. Try again.');
+      try {
+        const analysis = await FaceService.analyzeUntilGood(
+          () => webcamRef.current && webcamRef.current.getScreenshot(),
+          { isEnrollment: true }
+        );
+        if (!analysis.isGood) {
+          setError(`Step ${enrollmentStep + 1} Failed: ${analysis.reason}`);
+          setIsRecording(false);
+          return;
         }
+        
+        setEnrolledSamples(prev => {
+          const next = [...prev];
+          next[enrollmentStep] = analysis.descriptor;
+          return next;
+        });
+        
+        if (enrollmentStep < 2) {
+          setEnrollmentStep(prev => prev + 1);
+        } else {
+          setSuccess('All poses captured successfully!');
+        }
+      } catch (err) {
+        setError('Face analysis failed. Try again.');
       }
       setIsRecording(false);
-    }, 1000);
+    }, 500);
   };
 
   const handleSubmit = async (e) => {
