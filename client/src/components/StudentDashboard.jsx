@@ -193,19 +193,21 @@ const StudentDashboard = ({ user }) => {
 
       const frame = webcamRef.current.getScreenshot();
       if (frame) {
-        const analysis = await FaceService.analyzeBase64(frame);
-        framesForLiveness.push(analysis);
-        if (framesForLiveness.length > 15) framesForLiveness.shift();
-        if (FaceService.detectBlinkSequence(framesForLiveness)) {
-          isBlinkSuccessful.current = true;
-          setBlinkDetected(true);
-          setLivenessStatus('success');
-          clearInterval(livenessInterval);
-          performFinalSubmit(loc);
-          return;
+        const analysis = await FaceService.analyzeLivenessFrame(frame);
+        if (analysis) {
+          framesForLiveness.push(analysis);
+          if (framesForLiveness.length > 20) framesForLiveness.shift();
+          if (FaceService.detectBlinkSequence(framesForLiveness)) {
+            isBlinkSuccessful.current = true;
+            setBlinkDetected(true);
+            setLivenessStatus('success');
+            clearInterval(livenessInterval);
+            performFinalSubmit(loc);
+            return;
+          }
         }
       }
-      if (Date.now() - startLivenessTime > 15000) {
+      if (Date.now() - startLivenessTime > 20000) {
         clearInterval(livenessInterval);
         if (!isBlinkSuccessful.current) { // Fix: Check ref instead of stale state
           setLivenessStatus('idle');

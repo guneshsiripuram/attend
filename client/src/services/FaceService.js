@@ -1,6 +1,7 @@
 import * as faceapi from 'face-api.js';
 
 const MODEL_URL = '/models';
+const DETECTION_OPTIONS = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.6 });
 
 const QUALITY_THRESHOLDS = {
   minConfidence: 0.78,
@@ -220,41 +221,71 @@ class FaceService {
     return { isGood: false, reason: 'No face detected. Please face the light source (avoid bright backgrounds).' };
   }
 
+  /**
+   * Lightweight per-frame analyzer used during the blink challenge: detection
+   * + landmarks only (no descriptor, no quality-gate image stats), so the
+   * challenge can sample frames at several times per second.
+   */
+  async analyzeLivenessFrame(base64Image) {
+    if (!base64Image) return null;
+    if (!this.modelsLoaded) await this.loadModels();
+
+    try {
+      const img = new Image();
+      img.src = base64Image;
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = () => reject(new Error('Image decode failed'));
+      });
+
+      const detection = await faceapi
+        .detectSingleFace(img, DETECTION_OPTIONS)
+        .withFaceLandmarks();
+
+      if (!detection) return null;
+      return {
+        detection,
+        score: detection.detection?.score ?? detection.score
+      };
+    } catch (err) {
+      return null;
+    }
+  }
+
   detectBlinkSequence(frameResults) {
     if (!frameResults || frameResults.length < 5) return false;
 
+    // Eye aspect ratio during a real blink lands well inside this band; values
+    // outside it (e.g. profile views where the horizontal eye distance is ~0)
+    // would otherwise poison the baseline.
     const ears = frameResults
       .map(frame => {
         if (!frame?.detection?.landmarks) return null;
-        return this.calculateEAR(frame.detection.landmarks);
+        const ear = this.calculateEAR(frame.detection.landmarks);
+        return typeof ear === 'number' && !Number.isNaN(ear) && ear >= 0.05 && ear <= 0.8 ? ear : null;
       })
-      .filter(val => typeof val === 'number' && !Number.isNaN(val));
+      .filter(val => typeof val === 'number');
 
     if (ears.length < 5) return false;
 
-    // Fix Bug 5: Dynamic relative EAR threshold calculation
-    // Assume the user starts with open eyes, so max EAR is baseline
-    const baselineEAR = Math.max(...ears.slice(0, 3));
-    
-    // A blink is typically a 20-25% drop in EAR from baseline
-    const openThreshold = baselineEAR * 0.90;
-    const closedThreshold = baselineEAR * 0.75;
-    
-    let closedIndex = -1;
+    // Baseline is the most-open eye pair seen across the window (not just the
+    // first frames), so an early blink right after "Blink Now!" can't poison
+    // it: the moment the eyes open, the baseline updates to the open value.
+    const baseline = Math.max(...ears);
+    const openThreshold = baseline * 0.90;
+    const closedThreshold = baseline * 0.70;
 
-    for (let i = 0; i < ears.length; i++) {
+    // A blink is open -> closed -> open. Scanning every closed sample lets a
+    // single blink (even one spanning 2-3 frames) be recognised.
+    for (let i = 1; i < ears.length - 1; i++) {
       if (ears[i] < closedThreshold) {
-        closedIndex = i;
-        break;
+        const openBefore = ears.slice(0, i).some(v => v > openThreshold);
+        const openAfter = ears.slice(i + 1).some(v => v > openThreshold);
+        if (openBefore && openAfter) return true;
       }
     }
 
-    if (closedIndex === -1) return false;
-
-    const openBefore = ears.slice(0, closedIndex).some(val => val > openThreshold);
-    const openAfter = ears.slice(closedIndex + 1).some(val => val > openThreshold);
-
-    return openBefore && openAfter;
+    return false;
   }
 
   calculateEAR(landmarks) {
